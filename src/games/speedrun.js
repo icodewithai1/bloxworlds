@@ -1,7 +1,7 @@
 // BloxWorlds — Speedrunners (inspired by Speed Run 4)
 // Long straight levels you blast through at crazy speed. Finish the portal
 // at the end of each level to warp to the next. 4 levels, escalating speed.
-import * as THREE from 'three';
+import { Vector3, MeshBuilder, StandardMaterial, Color3, Mesh } from 'babylon';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
   ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome,
@@ -43,10 +43,10 @@ let portals = [];
 
 function buildLevel(idx) {
   // wipe old parts
-  for (const p of world.parts) engine.scene.remove(p.mesh);
+  for (const p of world.parts) p.mesh.dispose();
   world.parts.length = 0;
   world.checkpoints.length = 0;
-  for (const pr of portals) engine.scene.remove(pr.g);
+  for (const pr of portals) { pr.g.dispose(); pr.disc && pr.disc.dispose(); }
   portals = [];
 
   const th = LEVEL_THEMES[idx];
@@ -99,32 +99,38 @@ function buildLevel(idx) {
   z -= 20;
 
   // glowing rails along the course for the speed feel
-  const railM = new THREE.MeshBasicMaterial({ color: th.main });
+  const railM = new StandardMaterial('railm' + idx, engine.scene);
+  railM.emissiveColor = new Color3(((th.main >> 16) & 255) / 255, ((th.main >> 8) & 255) / 255, (th.main & 255) / 255);
+  railM.disableLighting = true;
   for (let rz = 0; rz > z; rz -= 30) {
     for (const sx of [-11, 11]) {
-      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 22), railM);
+      const rail = MeshBuilder.CreateBox('rail', { width: 0.4, height: 0.4, depth: 22 }, engine.scene);
+      rail.material = railM;
       rail.position.set(sx, y + 2 + Math.random() * 6, rz - 10);
-      engine.scene.add(rail);
-      world.parts.push({ mesh: rail, kind: 'deco', half: new THREE.Vector3(0, 0, 0), base: rail.position.clone(), delta: 0 });
+      world.parts.push({ mesh: rail, kind: 'deco', half: new Vector3(0, 0, 0), base: rail.position.clone(), delta: 0 });
     }
   }
 }
 
 function makePortal(x, y, z, color, idx) {
-  const g = new THREE.Group();
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(2.4, 0.35, 12, 32),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9, roughness: 0.3 })
-  );
-  g.add(ring);
-  const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(2.1, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-  );
-  g.add(disc);
-  g.position.set(x, y, z);
-  engine.scene.add(g);
-  portals.push({ g, x, y, z, idx });
+  const scene = engine.scene;
+  const cc = new Color3(((color >> 16) & 255) / 255, ((color >> 8) & 255) / 255, (color & 255) / 255);
+  const ring = MeshBuilder.CreateTorus('portal', { diameter: 4.8, thickness: 0.7, tessellation: 32 }, scene);
+  const rm = new StandardMaterial('portalm' + idx, scene);
+  rm.emissiveColor = cc;
+  rm.diffuseColor = cc.scale(0.4);
+  ring.material = rm;
+  ring.rotation.x = Math.PI / 2; // torus stands upright facing the runway
+  const disc = MeshBuilder.CreateDisc('portald', { radius: 2.1, tessellation: 24 }, scene);
+  const dm = new StandardMaterial('portaldm' + idx, scene);
+  dm.emissiveColor = new Color3(1, 1, 1);
+  dm.alpha = 0.35;
+  dm.disableLighting = true;
+  dm.backFaceCulling = false;
+  disc.material = dm;
+  ring.position.set(x, y, z);
+  disc.position.set(x, y, z);
+  portals.push({ g: ring, disc, x, y, z, idx });
 }
 
 // ------------------------------------------------------------------ player (FAST)
@@ -135,7 +141,7 @@ const player = new Player(engine, world, {
   speed: BASE_SPEED, jumpPower: 15
 });
 buildLevel(0);
-player.checkpoint.copy(world.spawn);
+player.checkpoint.copyFrom(world.spawn);
 player.respawn(false);
 db.recordPlay(GAME_ID);
 const runStart = performance.now();
@@ -223,7 +229,7 @@ net.join(db.name, db.look);
 // ------------------------------------------------------------------ level progression
 function nextLevel() {
   audio.play('portal');
-  fx.confetti(player.pos.clone().add(new THREE.Vector3(0, 2, 0)));
+  fx.confetti(player.pos.clone().add(new Vector3(0, 2, 0)));
   const t = Math.round((performance.now() - levelStart) / 100) / 10;
   level++;
   if (level >= LEVELS) {
@@ -244,7 +250,7 @@ function nextLevel() {
   net.sendEvent('level', { n: level });
   buildLevel(level);
   player.moveSpeed = BASE_SPEED + level * LEVEL_SPEED_BONUS;
-  player.checkpoint.copy(world.spawn);
+  player.checkpoint.copyFrom(world.spawn);
   player.respawn(false);
   levelStart = performance.now();
 }
@@ -252,7 +258,7 @@ function nextLevel() {
 player.onDeath = () => {
   flash('Wasted!', '#ff5252');
   audio.play('death');
-  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xff5252, 16);
+  fx.burst(player.pos.clone().add(new Vector3(0, 1.5, 0)), 0xff5252, 16);
   db.recordDeath(GAME_ID);
 };
 player.onJump = () => audio.play('jump');
@@ -294,15 +300,14 @@ engine.addSystem((dt, now) => {
 
   // portal spin + hit check
   for (const pr of portals) {
-    pr.g.rotation.z += dt * 1.5;
+    pr.g.rotation.y += dt * 1.5;
     const dx = player.pos.x - pr.x, dy = (player.pos.y + 1.3) - pr.y, dz = player.pos.z - pr.z;
     if (dx * dx + dy * dy + dz * dz < 7) { nextLevel(); break; }
   }
 
   // speed FOV kick
   const sp = player.speed;
-  engine.camera.fov = 70 + Math.min(sp * 0.55, 16);
-  engine.camera.updateProjectionMatrix();
+  engine.camera.fov = 1.22 + Math.min(sp * 0.0095, 0.28); // radians in Babylon
 
   if (now - lastNet > 66) {
     lastNet = now;

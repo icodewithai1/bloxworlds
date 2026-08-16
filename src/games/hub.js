@@ -1,5 +1,8 @@
 // BloxWorlds — hub page: profile, 3D avatar preview, live server directory
-import * as THREE from 'three';
+import {
+  Engine as BEngine, Scene, Vector3, Color3, Color4, FreeCamera,
+  DirectionalLight, HemisphericLight
+} from 'babylon';
 import { Database } from '../engine/Database.js';
 import { ServerDirectory } from '../engine/ServerDirectory.js';
 import { Avatar } from '../engine/Avatar.js';
@@ -19,49 +22,47 @@ uname.addEventListener('input', () => {
   navUser.textContent = db.name;
 });
 
-// ---------------- 3D avatar preview ----------------
+// ---------------- 3D avatar preview (Babylon.js) ----------------
 const avCanvas = document.getElementById('avcanvas');
 let avatar = null;
 (function initPreview() {
   if (!avCanvas) return;
-  const renderer = new THREE.WebGLRenderer({ canvas: avCanvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(150, 190, false);
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  const beng = new BEngine(avCanvas, true, { alpha: true }, true);
+  const scene = new Scene(beng);
+  scene.clearColor = new Color4(0, 0, 0, 0);
 
-  const scene = new THREE.Scene();
-  const cam = new THREE.PerspectiveCamera(32, 150 / 190, 0.1, 50);
-  cam.position.set(0, 1.9, 6.4);
-  cam.lookAt(0, 1.35, 0);
+  const cam = new FreeCamera('pcam', new Vector3(0, 1.9, 6.4), scene);
+  cam.setTarget(new Vector3(0, 1.35, 0));
+  cam.fov = 0.56;
+  cam.inputs.clear();
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.9));
-  const key = new THREE.DirectionalLight(0xfff4e0, 2.2);
-  key.position.set(2, 4, 3);
-  scene.add(key);
-  const rim = new THREE.DirectionalLight(0x9ecfff, 1.0);
-  rim.position.set(-3, 2, -2);
-  scene.add(rim);
+  const hemi = new HemisphericLight('ph', new Vector3(0, 1, 0), scene);
+  hemi.intensity = 0.75;
+  const key = new DirectionalLight('pk', new Vector3(-0.4, -0.7, -0.6), scene);
+  key.intensity = 1.4;
+  key.diffuse = new Color3(1, 0.96, 0.88);
+
+  // minimal engine shim: Avatar only needs .scene and .addShadows()
+  const engineShim = { scene, addShadows: (m) => m };
 
   const setAvatar = () => {
-    if (avatar) scene.remove(avatar.group);
-    avatar = new Avatar(db.look);
-    scene.add(avatar.group);
+    if (avatar) avatar.dispose();
+    avatar = new Avatar(engineShim, db.look);
   };
   setAvatar();
   window.__setAvatar = setAvatar;
 
   let last = performance.now();
-  (function loop(now) {
-    requestAnimationFrame(loop);
+  beng.runRenderLoop(() => {
+    const now = performance.now();
     const dt = Math.min((now - last) / 1000, 0.05);
     last = now;
     if (avatar) {
       avatar.group.rotation.y += dt * 0.8;
-      avatar.animate(dt, 0, true); // idle sway
+      avatar.animate(dt, 0, true);
     }
-    renderer.render(scene, cam);
-  })(last);
+    scene.render();
+  });
 })();
 
 randBtn.addEventListener('click', () => {

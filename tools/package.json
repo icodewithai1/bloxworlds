@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@babylonjs/core": "^9.21.2",
     "@sparticuz/chromium": "^149.0.0",
     "esbuild": "^0.28.2",
     "javascript-obfuscator": "^4.2.2",

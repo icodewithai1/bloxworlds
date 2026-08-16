@@ -1,5 +1,5 @@
-// BloxWorlds Engine — Player: physics character controller
-import * as THREE from 'three';
+// BloxWorlds Engine — Player: physics character controller (Babylon.js)
+import { Vector3 } from 'babylon';
 import { clamp, lerp, lerpAngle } from './Engine.js';
 import { Avatar } from './Avatar.js';
 
@@ -15,7 +15,7 @@ export class Player {
     this.jumpPower = jumpPower;
 
     this.pos = world.spawn.clone();
-    this.vel = new THREE.Vector3();
+    this.vel = new Vector3(0, 0, 0);
     this.yaw = 0;
     this.grounded = false;
     this.checkpoint = world.spawn.clone();
@@ -23,15 +23,14 @@ export class Player {
     this.deaths = 0;
     this.won = false;
 
-    this.avatar = new Avatar(look).setNameTag(name);
-    engine.scene.add(this.avatar.group);
+    this.avatar = new Avatar(engine, look).setNameTag(name);
 
     this.onDeath = null;
     this.onCheckpoint = null;
     this.onWin = null;
     this.onJump = null;
     this.onLand = null;
-    this.onTouchKind = null; // custom part kinds (e.g. 'boost', 'level')
+    this.onTouchKind = null;
   }
 
   respawn(died) {
@@ -39,7 +38,7 @@ export class Player {
       this.deaths++;
       this.onDeath && this.onDeath();
     }
-    this.pos.copy(this.checkpoint);
+    this.pos.copyFrom(this.checkpoint);
     this.vel.set(0, 0, 0);
   }
 
@@ -69,11 +68,16 @@ export class Player {
       this.onJump && this.onJump();
     }
 
-    const next = this.pos.clone().addScaledVector(this.vel, dt);
+    const next = new Vector3(
+      this.pos.x + this.vel.x * dt,
+      this.pos.y + this.vel.y * dt,
+      this.pos.z + this.vel.z * dt
+    );
     let grounded = false;
     let riding = null;
 
     for (const q of world.parts) {
+      if (q.kind === 'deco') continue;
       if (q.kind === 'spinner') { this._spinnerHit(q); continue; }
       const c = q.mesh.position;
       const hx = q.half.x + PR, hy = q.half.y, hz = q.half.z + PR;
@@ -108,19 +112,19 @@ export class Player {
     if (grounded && !this.grounded && this._fell > 0.15) this.onLand && this.onLand();
     this._fell = grounded ? 0 : (this._fell || 0) + dt;
 
-    this.pos.copy(next);
+    this.pos.copyFrom(next);
     this.grounded = grounded;
 
     if (this.pos.y < -25) this.respawn(true);
 
     // sync avatar
-    this.avatar.group.position.copy(this.pos);
+    this.avatar.group.position.copyFrom(this.pos);
     this.avatar.group.rotation.y = this.yaw;
     this.avatar.animate(dt, this.speed, this.grounded);
   }
 
   _spinnerHit(q) {
-    const rel = this.pos.clone().sub(q.mesh.position);
+    const rel = this.pos.subtract(q.mesh.position);
     if (this.pos.y > q.mesh.position.y + 0.5 || this.pos.y + PH < q.mesh.position.y - 0.5) return;
     const a = -q.mesh.rotation.y;
     const lx = rel.x * Math.cos(a) - rel.z * Math.sin(a);
@@ -153,7 +157,7 @@ export class Player {
       this.pos.y + 1.8 + Math.sin(cp) * cd,
       this.pos.z + Math.cos(cy) * Math.cos(cp) * cd
     );
-    cam.lookAt(this.pos.x, this.pos.y + 1.6, this.pos.z);
+    cam.setTarget(new Vector3(this.pos.x, this.pos.y + 1.6, this.pos.z));
   }
 }
 
@@ -162,9 +166,8 @@ export class RemotePlayer {
   constructor(engine, { name, look }) {
     this.engine = engine;
     this.name = name;
-    this.avatar = new Avatar(look || {}).setNameTag(name || 'Guest');
-    engine.scene.add(this.avatar.group);
-    this.target = { pos: new THREE.Vector3(0, 3, 0), yaw: 0, grounded: true, speed: 0 };
+    this.avatar = new Avatar(engine, look || {}).setNameTag(name || 'Guest');
+    this.target = { pos: new Vector3(0, 3, 0), yaw: 0, grounded: true, speed: 0 };
     this.stage = 0;
   }
 
@@ -177,12 +180,17 @@ export class RemotePlayer {
 
   update(dt) {
     const g = this.avatar.group;
-    g.position.lerp(this.target.pos, Math.min(dt * 12, 1));
+    const k = Math.min(dt * 12, 1);
+    g.position.set(
+      lerp(g.position.x, this.target.pos.x, k),
+      lerp(g.position.y, this.target.pos.y, k),
+      lerp(g.position.z, this.target.pos.z, k)
+    );
     g.rotation.y = lerpAngle(g.rotation.y, this.target.yaw, dt * 12);
     this.avatar.animate(dt, this.target.speed, this.target.grounded);
   }
 
   dispose() {
-    this.engine.scene.remove(this.avatar.group);
+    this.avatar.dispose();
   }
 }

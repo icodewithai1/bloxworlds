@@ -1,6 +1,6 @@
 /* BloxWorlds build script
  * 1. esbuild bundles src/games/*.js (+ the engine) into single ES modules
- *    (three & trystero stay external — loaded from vendor/ via import map)
+ *    (babylon & trystero stay external — loaded from vendor/ via import map)
  * 2. javascript-obfuscator deeply obfuscates each bundle -> js/*.js
  * Run:  node tools/build.js
  */
@@ -54,7 +54,7 @@ fs.mkdirSync(OUT, { recursive: true });
       bundle: true,
       format: 'esm',
       write: false,
-      external: ['three', 'trystero/nostr'],
+      external: ['babylon', 'trystero/nostr'],
       target: 'es2020'
     });
     const code = bundled.outputFiles[0].text;

@@ -1,134 +1,170 @@
-// BloxWorlds Engine — core renderer + scene + game loop
-import * as THREE from 'three';
+// BloxWorlds Engine — core renderer + scene + game loop (Babylon.js)
+import {
+  Engine as BEngine, Scene, Vector3, Color3, Color4, FreeCamera,
+  DirectionalLight, HemisphericLight, ShadowGenerator, MeshBuilder,
+  StandardMaterial, DynamicTexture, Mesh
+} from 'babylon';
 
 export class Engine {
   constructor(canvas) {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    // modern shading: filmic tone mapping + correct color space
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.12;
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.babylon = new BEngine(canvas, true, { stencil: false, alpha: false }, true);
+    this.babylon.setHardwareScalingLevel(1 / Math.min(window.devicePixelRatio, 2));
 
-    this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x87ceeb);
-    this.scene.fog = new THREE.Fog(0x87ceeb, 120, 420);
+    const scene = new Scene(this.babylon);
+    this.scene = scene;
+    scene.clearColor = new Color4(0.53, 0.81, 0.92, 1);
+    scene.ambientColor = new Color3(0.55, 0.62, 0.7);
 
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // fog
+    scene.fogMode = Scene.FOGMODE_LINEAR;
+    scene.fogStart = 120;
+    scene.fogEnd = 420;
+    scene.fogColor = new Color3(0.62, 0.83, 0.93);
 
-    const sun = new THREE.DirectionalLight(0xfff4e0, 2.6);
-    sun.position.set(60, 120, 40);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.radius = 6;
-    sun.shadow.bias = -0.0004;
-    Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, far: 420 });
-    this.scene.add(sun);
-    this.scene.add(new THREE.AmbientLight(0xbfd9ff, 0.55));
-    this.scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x707c6a, 1.0));
-    // subtle fill from the opposite side so shaded faces aren't flat black
-    const fill = new THREE.DirectionalLight(0xa8c4e0, 0.5);
-    fill.position.set(-50, 60, -60);
-    this.scene.add(fill);
+    // camera (we position it manually every frame like the old engine)
+    this.camera = new FreeCamera('cam', new Vector3(0, 6, 10), scene);
+    this.camera.minZ = 0.1;
+    this.camera.maxZ = 1000;
+    this.camera.fov = 1.22; // ~70deg vertical
+    this.camera.inputs.clear(); // fully manual
+
+    // lights
+    const sun = new DirectionalLight('sun', new Vector3(-0.45, -0.85, -0.3), scene);
+    sun.position = new Vector3(60, 120, 40);
+    sun.intensity = 1.35;
+    sun.diffuse = new Color3(1, 0.96, 0.88);
     this.sun = sun;
 
+    const hemi = new HemisphericLight('hemi', new Vector3(0, 1, 0), scene);
+    hemi.intensity = 0.55;
+    hemi.diffuse = new Color3(0.81, 0.91, 1);
+    hemi.groundColor = new Color3(0.44, 0.49, 0.42);
+
+    // shadows
+    this.shadows = new ShadowGenerator(2048, sun);
+    this.shadows.usePercentageCloserFiltering = true;
+    this.shadows.bias = 0.0009;
+    this.shadows.normalBias = 0.02;
+
     this._systems = [];
-    this._last = performance.now();
     this._t0 = performance.now();
 
-    window.addEventListener('resize', () => {
-      this.camera.aspect = window.innerWidth / window.innerHeight;
-      this.camera.updateProjectionMatrix();
-      this.renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+    window.addEventListener('resize', () => this.babylon.resize());
   }
 
   get time() { return (performance.now() - this._t0) / 1000; }
 
   addSystem(fn) { this._systems.push(fn); return this; }
 
-  // Gradient skybox dome (day / sunset / night presets)
+  // register a mesh as shadow caster + receiver
+  addShadows(mesh) {
+    this.shadows.addShadowCaster(mesh, true);
+    mesh.receiveShadows = true;
+    mesh.getChildMeshes && mesh.getChildMeshes().forEach((m) => { m.receiveShadows = true; });
+    return mesh;
+  }
+
   setSky(preset = 'day') {
     const P = {
-      day:    { top: '#2a7fd4', mid: '#87ceeb', bot: '#dff1fa', fog: 0x9fd4ee },
-      sunset: { top: '#3b2a68', mid: '#e2653e', bot: '#ffc46b', fog: 0xe8926a },
-      night:  { top: '#050a1e', mid: '#14224a', bot: '#2c3e6e', fog: 0x1a2547 }
+      day:    { top: '#2a7fd4', mid: '#87ceeb', bot: '#dff1fa', fog: [0.62, 0.83, 0.93] },
+      sunset: { top: '#3b2a68', mid: '#e2653e', bot: '#ffc46b', fog: [0.91, 0.57, 0.42] },
+      night:  { top: '#050a1e', mid: '#14224a', bot: '#2c3e6e', fog: [0.10, 0.15, 0.28] }
     }[preset] || {};
-    const cv = document.createElement('canvas');
-    cv.width = 16; cv.height = 256;
-    const ctx = cv.getContext('2d');
-    const gr = ctx.createLinearGradient(0, 0, 0, 256);
+
+    const tex = new DynamicTexture('skytex', { width: 32, height: 512 }, this.scene, false);
+    const ctx = tex.getContext();
+    const gr = ctx.createLinearGradient(0, 0, 0, 512);
     gr.addColorStop(0, P.top); gr.addColorStop(0.55, P.mid); gr.addColorStop(1, P.bot);
-    ctx.fillStyle = gr; ctx.fillRect(0, 0, 16, 256);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(480, 24, 16),
-      new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false })
-    );
-    dome.renderOrder = -10;
-    this.scene.add(dome);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, 32, 512);
+    tex.update(false);
+
+    const dome = MeshBuilder.CreateSphere('sky', { diameter: 960, segments: 16, sideOrientation: Mesh.BACKSIDE }, this.scene);
+    const mat = new StandardMaterial('skymat', this.scene);
+    mat.emissiveTexture = tex;
+    mat.diffuseColor = new Color3(0, 0, 0);
+    mat.specularColor = new Color3(0, 0, 0);
+    mat.disableLighting = true;
+    mat.fogEnabled = false;
+    dome.material = mat;
+    dome.applyFog = false;
+    dome.isPickable = false;
     this.skyDome = dome;
-    this.scene.background = null;
-    this.scene.fog = new THREE.Fog(P.fog, 130, 460);
+    // keep dome centered on camera
+    this.addSystem(() => { dome.position.copyFrom(this.camera.position); });
+
+    this.scene.fogColor = new Color3(...P.fog);
     if (preset === 'night') this._addStars();
     if (preset === 'sunset') {
-      const sunBall = new THREE.Mesh(
-        new THREE.SphereGeometry(22, 16, 12),
-        new THREE.MeshBasicMaterial({ color: 0xffdca0, fog: false })
-      );
-      sunBall.position.set(180, 60, -400);
-      this.scene.add(sunBall);
+      const ball = MeshBuilder.CreateSphere('sunball', { diameter: 44, segments: 10 }, this.scene);
+      const bm = new StandardMaterial('sunballm', this.scene);
+      bm.emissiveColor = new Color3(1, 0.86, 0.63);
+      bm.disableLighting = true;
+      bm.fogEnabled = false;
+      ball.material = bm;
+      ball.applyFog = false;
+      ball.position.set(180, 60, -400);
+      this.addSystem(() => {
+        ball.position.set(this.camera.position.x + 180, this.camera.position.y + 60, this.camera.position.z - 400);
+      });
     }
     return this;
   }
 
   _addStars() {
-    const n = 400, pos = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) {
+    const mat = new StandardMaterial('starm', this.scene);
+    mat.emissiveColor = new Color3(1, 1, 1);
+    mat.disableLighting = true;
+    mat.fogEnabled = false;
+    const base = MeshBuilder.CreateBox('star0', { size: 1.4 }, this.scene);
+    base.material = mat;
+    base.applyFog = false;
+    base.isVisible = false;
+    const stars = [];
+    for (let i = 0; i < 260; i++) {
       const t = Math.random() * Math.PI * 2, p = Math.random() * Math.PI * 0.48;
       const r = 460;
-      pos[i * 3] = Math.cos(t) * Math.cos(p) * r;
-      pos[i * 3 + 1] = Math.sin(p) * r + 10;
-      pos[i * 3 + 2] = Math.sin(t) * Math.cos(p) * r;
+      const inst = base.createInstance('star' + i);
+      inst.position.set(Math.cos(t) * Math.cos(p) * r, Math.sin(p) * r + 10, Math.sin(t) * Math.cos(p) * r);
+      stars.push(inst);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    this.scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, fog: false, sizeAttenuation: false })));
+    this.addSystem(() => {
+      for (const s of stars) { /* stars stay world-anchored; cheap enough */ }
+    });
   }
 
-
   addClouds(count = 26) {
-    const cg = new THREE.SphereGeometry(1, 8, 6);
-    const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+    const mat = new StandardMaterial('cloudm', this.scene);
+    mat.emissiveColor = new Color3(1, 1, 1);
+    mat.disableLighting = true;
+    mat.alpha = 0.85;
+    mat.fogEnabled = false;
     for (let i = 0; i < count; i++) {
-      const cl = new THREE.Group();
       const n = 3 + ((Math.random() * 3) | 0);
       for (let j = 0; j < n; j++) {
-        const s = new THREE.Mesh(cg, cm);
-        s.position.set((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 5);
         const k = 2.5 + Math.random() * 3.5;
-        s.scale.set(k * 1.6, k * 0.7, k);
-        cl.add(s);
+        const s = MeshBuilder.CreateSphere('cl', { diameterX: k * 3.2, diameterY: k * 1.4, diameterZ: k * 2, segments: 6 }, this.scene);
+        s.material = mat;
+        s.applyFog = false;
+        s.isPickable = false;
+        s.position.set(
+          (Math.random() - 0.5) * 480 + (Math.random() - 0.5) * 8,
+          55 + Math.random() * 60 + (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 480 + (Math.random() - 0.5) * 5
+        );
       }
-      cl.position.set((Math.random() - 0.5) * 480, 55 + Math.random() * 60, (Math.random() - 0.5) * 480);
-      this.scene.add(cl);
     }
   }
 
   start() {
-    const loop = (now) => {
-      requestAnimationFrame(loop);
-      const dt = Math.min((now - this._last) / 1000, 0.05);
-      this._last = now;
+    let last = performance.now();
+    this.babylon.runRenderLoop(() => {
+      const now = performance.now();
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
       for (const s of this._systems) s(dt, now);
-      this.renderer.render(this.scene, this.camera);
-    };
-    requestAnimationFrame(loop);
+      this.scene.render();
+    });
   }
 }
 

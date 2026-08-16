@@ -1,5 +1,5 @@
 // BloxWorlds — Mega Obby (built on the BloxWorlds engine + Trystero P2P)
-import * as THREE from 'three';
+import { Vector3, MeshBuilder, StandardMaterial, Color3 } from 'babylon';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
   ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome,
@@ -86,13 +86,13 @@ function buildMap() {
   }
   z -= 6;
   P({ x: 0, y: yy + 0.5, z: z - 4, w: 14, h: 1, d: 14, color: 0xffd700, kind: 'win' });
-  world.addModel(
-    new THREE.Mesh(
-      new THREE.CylinderGeometry(0.6, 1.1, 2.4, 16),
-      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.25 })
-    ),
-    new THREE.Vector3(0, yy + 2.3, z - 4)
-  );
+  const trophy = MeshBuilder.CreateCylinder('trophy', { diameterTop: 1.2, diameterBottom: 2.2, height: 2.4, tessellation: 16 }, engine.scene);
+  const tm = new StandardMaterial('trophym', engine.scene);
+  tm.diffuseColor = new Color3(1, 0.84, 0);
+  tm.emissiveColor = new Color3(0.35, 0.28, 0);
+  tm.specularColor = new Color3(0.8, 0.8, 0.5);
+  trophy.material = tm;
+  world.addModel(trophy, new Vector3(0, yy + 2.3, z - 4));
 }
 buildMap();
 
@@ -204,9 +204,9 @@ net.onEvent = (id, kind, e) => {
     }
   } else if (kind === 'win') {
     chatLine('SYSTEM', `🏆 ${name} finished the obby!`, true);
-    if (r) fx.confetti(r.avatar.group.position.clone().add(new THREE.Vector3(0, 2, 0)));
+    if (r) fx.confetti(r.avatar.group.position.clone().add(new Vector3(0, 2, 0)));
   } else if (kind === 'died') {
-    if (r) fx.burst(r.avatar.group.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xd32f2f, 14);
+    if (r) fx.burst(r.avatar.group.position.clone().add(new Vector3(0, 1.5, 0)), 0xd32f2f, 14);
   }
 };
 net.join(db.name, db.look);
@@ -215,14 +215,14 @@ net.join(db.name, db.look);
 player.onDeath = () => {
   flash('You died!', '#ff5252');
   audio.play('death');
-  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xd32f2f, 16);
+  fx.burst(player.pos.clone().add(new Vector3(0, 1.5, 0)), 0xd32f2f, 16);
   db.recordDeath(GAME_ID);
   net.sendEvent('died');
 };
 player.onCheckpoint = (n) => {
   flash(`Checkpoint ${n}!`, '#69f0ae');
   audio.play('checkpoint');
-  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0xffee58, 12, 6);
+  fx.burst(player.pos.clone().add(new Vector3(0, 1, 0)), 0xffee58, 12, 6);
   db.recordStage(GAME_ID, n);
   net.sendEvent('stage', { n });
 };
@@ -231,7 +231,7 @@ player.onWin = () => {
   const s = db.recordWin(GAME_ID, t);
   flash('🏆 YOU WIN! 🏆', '#ffd700');
   audio.play('win');
-  fx.confetti(player.pos.clone().add(new THREE.Vector3(0, 2, 0)));
+  fx.confetti(player.pos.clone().add(new Vector3(0, 2, 0)));
   chatLine('SYSTEM', `You finished in ${t}s (best: ${s.bestTime}s, wins: ${s.wins})`, true);
   net.sendEvent('win');
 };

@@ -26,7 +26,7 @@
 
   <div class="wrap">
     <div class="profile-card">
-      <div id="avprev"></div>
+      <canvas id="avcanvas" width="150" height="190"></canvas>
       <div class="profile-info">
         <input id="uname" maxlength="20" placeholder="Username" spellcheck="false">
         <div class="stats" id="stats"></div>
@@ -42,9 +42,13 @@
       <a class="gcard" id="playObby" href="obby.html">
         <div class="thumb"><img src="assets/obby.png" alt="Mega Obby"></div>
         <div class="gtitle">Mega Obby</div>
-        <div class="gmeta"><span class="up">👍 94%</span><span class="playing" id="playingCt">👤 P2P</span></div>
+        <div class="gmeta"><span class="up">👍 94%</span><span class="playing">👤 P2P</span></div>
       </a>
-      <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
+      <a class="gcard" href="speedrun.html">
+        <div class="thumb"><img src="assets/speedrun.png" alt="Speedrunners"></div>
+        <div class="gtitle">Speedrunners</div>
+        <div class="gmeta"><span class="up">👍 97%</span><span class="playing">👤 P2P</span></div>
+      </a>
       <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
       <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
     </div>

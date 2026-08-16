@@ -51,6 +51,57 @@ export class Engine {
 
   addSystem(fn) { this._systems.push(fn); return this; }
 
+  // Gradient skybox dome (day / sunset / night presets)
+  setSky(preset = 'day') {
+    const P = {
+      day:    { top: '#2a7fd4', mid: '#87ceeb', bot: '#dff1fa', fog: 0x9fd4ee },
+      sunset: { top: '#3b2a68', mid: '#e2653e', bot: '#ffc46b', fog: 0xe8926a },
+      night:  { top: '#050a1e', mid: '#14224a', bot: '#2c3e6e', fog: 0x1a2547 }
+    }[preset] || {};
+    const cv = document.createElement('canvas');
+    cv.width = 16; cv.height = 256;
+    const ctx = cv.getContext('2d');
+    const gr = ctx.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, P.top); gr.addColorStop(0.55, P.mid); gr.addColorStop(1, P.bot);
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, 16, 256);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(480, 24, 16),
+      new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false })
+    );
+    dome.renderOrder = -10;
+    this.scene.add(dome);
+    this.skyDome = dome;
+    this.scene.background = null;
+    this.scene.fog = new THREE.Fog(P.fog, 130, 460);
+    if (preset === 'night') this._addStars();
+    if (preset === 'sunset') {
+      const sunBall = new THREE.Mesh(
+        new THREE.SphereGeometry(22, 16, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffdca0, fog: false })
+      );
+      sunBall.position.set(180, 60, -400);
+      this.scene.add(sunBall);
+    }
+    return this;
+  }
+
+  _addStars() {
+    const n = 400, pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const t = Math.random() * Math.PI * 2, p = Math.random() * Math.PI * 0.48;
+      const r = 460;
+      pos[i * 3] = Math.cos(t) * Math.cos(p) * r;
+      pos[i * 3 + 1] = Math.sin(p) * r + 10;
+      pos[i * 3 + 2] = Math.sin(t) * Math.cos(p) * r;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, fog: false, sizeAttenuation: false })));
+  }
+
+
   addClouds(count = 26) {
     const cg = new THREE.SphereGeometry(1, 8, 6);
     const cm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });

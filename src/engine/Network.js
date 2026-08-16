@@ -131,6 +131,7 @@ function sanitizeName(s) {
 function sanitizeChat(s) {
   return String(s || '').replace(/[\u0000-\u001f]/g, '').slice(0, 140);
 }
+const OK_STYLES = ['bacon', 'swoosh', 'spiky', 'bob', 'cap', 'none'];
 function sanitizeLook(look) {
   if (!look || typeof look !== 'object') return {};
   const out = {};
@@ -138,5 +139,6 @@ function sanitizeLook(look) {
     const v = Number(look[k]);
     if (Number.isInteger(v) && v >= 0 && v <= 0xffffff) out[k] = v;
   }
+  if (OK_STYLES.includes(look.style)) out.style = look.style;
   return out;
 }

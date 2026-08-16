@@ -7,3 +7,5 @@ export { Input } from './Input.js';
 export { Network } from './Network.js';
 export { Database } from './Database.js';
 export { ServerDirectory, makeServerCode } from './ServerDirectory.js';
+export { Audio } from './Audio.js';
+export { HAIR_STYLES } from './Avatar.js';

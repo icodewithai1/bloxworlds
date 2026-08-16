@@ -6,6 +6,7 @@ const SHIRT_COLORS = [0x1f7fd1, 0xd32f2f, 0x00a06a, 0xf9a825, 0x8e24aa, 0xe8e8e8
 const JACKET_COLORS = [0x17181a, 0x2c3540, 0x4e342e, 0x263a26, 0x3c1f42];
 const PANT_COLORS = [0x2a332a, 0x27303d, 0x3a2c22, 0x21252a, 0x402433];
 const HAIR_COLORS = [0x7a4a21, 0x2c221b, 0xc9a04a, 0x8d3b1f, 0x3a3a3c];
+const HAIR_STYLES = ['bacon', 'swoosh', 'spiky', 'bob', 'cap'];
 
 function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
 
@@ -25,9 +26,11 @@ export class Database {
     if (!this.data.profile.look || this.data.profile.look.shirt === undefined) {
       this.data.profile.look = {
         shirt: pick(SHIRT_COLORS), jacket: pick(JACKET_COLORS),
-        pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS), skin: 0xf3f3f3
+        pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS),
+        style: pick(HAIR_STYLES), skin: 0xf3f3f3
       };
     }
+    if (!this.data.profile.look.style) this.data.profile.look.style = pick(HAIR_STYLES);
     this.save();
   }
 
@@ -43,7 +46,8 @@ export class Database {
   randomizeLook() {
     this.setLook({
       shirt: pick(SHIRT_COLORS), jacket: pick(JACKET_COLORS),
-      pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS), skin: 0xf3f3f3
+      pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS),
+      style: pick(HAIR_STYLES), skin: 0xf3f3f3
     });
     return this.look;
   }

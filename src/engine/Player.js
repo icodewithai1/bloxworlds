@@ -3,14 +3,16 @@ import * as THREE from 'three';
 import { clamp, lerp, lerpAngle } from './Engine.js';
 import { Avatar } from './Avatar.js';
 
-const GRAV = 32, JUMP = 13.5, SPEED = 9.4, PR = 0.45, PH = 2.7;
+const GRAV = 32, PR = 0.45, PH = 2.7;
 
 export class Player {
-  constructor(engine, world, { name, look }) {
+  constructor(engine, world, { name, look, speed = 9.4, jumpPower = 13.5 }) {
     this.engine = engine;
     this.world = world;
     this.name = name;
     this.look = look;
+    this.moveSpeed = speed;
+    this.jumpPower = jumpPower;
 
     this.pos = world.spawn.clone();
     this.vel = new THREE.Vector3();
@@ -27,6 +29,9 @@ export class Player {
     this.onDeath = null;
     this.onCheckpoint = null;
     this.onWin = null;
+    this.onJump = null;
+    this.onLand = null;
+    this.onTouchKind = null; // custom part kinds (e.g. 'boost', 'level')
   }
 
   respawn(died) {
@@ -51,16 +56,17 @@ export class Player {
     if (it.x !== 0 || it.z !== 0) {
       const ang = Math.atan2(it.x, it.z) + input.camYaw;
       const mag = Math.min(Math.hypot(it.x, it.z), 1);
-      wx = Math.sin(ang) * SPEED * mag;
-      wz = Math.cos(ang) * SPEED * mag;
+      wx = Math.sin(ang) * this.moveSpeed * mag;
+      wz = Math.cos(ang) * this.moveSpeed * mag;
       this.yaw = lerpAngle(this.yaw, Math.atan2(wx, wz), dt * 12);
     }
     this.vel.x = lerp(this.vel.x, wx, dt * (this.grounded ? 14 : 5));
     this.vel.z = lerp(this.vel.z, wz, dt * (this.grounded ? 14 : 5));
 
     if (input.jump && this.grounded) {
-      this.vel.y = JUMP;
+      this.vel.y = this.jumpPower;
       this.grounded = false;
+      this.onJump && this.onJump();
     }
 
     const next = this.pos.clone().addScaledVector(this.vel, dt);
@@ -99,6 +105,9 @@ export class Player {
 
     if (riding) next.x += riding.delta;
 
+    if (grounded && !this.grounded && this._fell > 0.15) this.onLand && this.onLand();
+    this._fell = grounded ? 0 : (this._fell || 0) + dt;
+
     this.pos.copy(next);
     this.grounded = grounded;
 
@@ -133,6 +142,7 @@ export class Player {
       this.won = true;
       this.onWin && this.onWin();
     }
+    if (this.onTouchKind) this.onTouchKind(q);
   }
 
   updateCamera(input) {

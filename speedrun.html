@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Speedrunners - BloxWorlds</title>
+<link rel="icon" type="image/png" href="assets/icon.png">
+<meta name="theme-color" content="#e2653e">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="game">
+  <canvas id="c"></canvas>
+
+  <div id="hud"></div>
+  <div id="conn" class="off">● Connecting…</div>
+  <div id="msg"></div>
+
+  <div id="chat">
+    <div id="chatlog"></div>
+    <input id="chatin" maxlength="140" placeholder="Say something… (Enter to send, Esc to close)">
+  </div>
+
+  <div id="help">
+    WASD / arrows — move &nbsp;•&nbsp; Space — jump<br>
+    Drag mouse — camera &nbsp;•&nbsp; Scroll — zoom<br>
+    Enter — chat &nbsp;•&nbsp; R — respawn<br>
+    <a href="index.html">← Back to BloxWorlds</a>
+  </div>
+
+  <!-- mobile controls -->
+  <div id="joy"><div id="joyknob"></div></div>
+  <button id="jumpbtn">JUMP</button>
+  <button id="chatbtn">💬 Chat</button>
+
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three.min.js", "trystero/nostr": "./vendor/trystero-nostr.min.js" } }
+  </script>
+  <script type="module" src="js/speedrun.js"></script>
+</body>
+</html>

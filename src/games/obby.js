@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
-  ServerDirectory, makeServerCode
+  ServerDirectory, makeServerCode, Audio
 } from '../engine/index.js';
 
 const GAME_ID = 'obby';
@@ -18,9 +18,12 @@ const RAINBOW = [0xe2231a, 0xff8f00, 0xfdd835, 0x43a047, 0x1e88e5, 0x8e24aa];
 // ------------------------------------------------------------------ setup
 const db = new Database();
 const engine = new Engine(document.getElementById('c'));
+engine.setSky('day');
 engine.addClouds();
 const world = new World(engine);
 const input = new Input(engine.canvas);
+const audio = new Audio();
+audio.playMusic('chill');
 
 // ------------------------------------------------------------------ map
 function buildMap() {
@@ -192,11 +195,13 @@ net.join(db.name, db.look);
 // ------------------------------------------------------------------ player events
 player.onDeath = () => {
   flash('You died!', '#ff5252');
+  audio.play('death');
   db.recordDeath(GAME_ID);
   net.sendEvent('died');
 };
 player.onCheckpoint = (n) => {
   flash(`Checkpoint ${n}!`, '#69f0ae');
+  audio.play('checkpoint');
   db.recordStage(GAME_ID, n);
   net.sendEvent('stage', { n });
 };
@@ -204,9 +209,12 @@ player.onWin = () => {
   const t = Math.round((performance.now() - runStart) / 100) / 10;
   const s = db.recordWin(GAME_ID, t);
   flash('🏆 YOU WIN! 🏆', '#ffd700');
+  audio.play('win');
   chatLine('SYSTEM', `You finished in ${t}s (best: ${s.bestTime}s, wins: ${s.wins})`, true);
   net.sendEvent('win');
 };
+player.onJump = () => audio.play('jump');
+player.onLand = () => audio.play('land');
 
 // ------------------------------------------------------------------ chat + keys
 window.addEventListener('keydown', (e) => {

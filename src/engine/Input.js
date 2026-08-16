@@ -1,10 +1,12 @@
-// BloxWorlds Engine — Input: keyboard + mouse + mobile touch (joystick & jump button)
+// BloxWorlds Engine — Input: keyboard + mouse + mobile touch.
+// Mobile: DYNAMIC joystick — appears wherever you first touch the left half
+// of the screen and follows your drag; right side drags the camera.
 import { clamp } from './Engine.js';
 
 export class Input {
   constructor(canvas) {
     this.keys = {};
-    this.moveX = 0;       // -1..1 from joystick
+    this.moveX = 0;
     this.moveZ = 0;
     this.jump = false;
     this.camYaw = 0;
@@ -43,74 +45,87 @@ export class Input {
   _setupTouch(canvas) {
     document.body.classList.add('touch');
 
-    // joystick
-    const stick = document.getElementById('joy');
+    const joy = document.getElementById('joy');
     const knob = document.getElementById('joyknob');
     const jumpBtn = document.getElementById('jumpbtn');
-    if (!stick) return;
-    stick.style.display = jumpBtn.style.display = 'block';
+    if (!joy) return;
+    jumpBtn.style.display = 'flex';
 
-    let joyId = null, jx = 0, jy = 0;
-    const rectCenter = () => {
-      const r = stick.getBoundingClientRect();
-      return { x: r.left + r.width / 2, y: r.top + r.height / 2, rad: r.width / 2 };
+    let joyId = null;      // touch id steering the stick
+    let camId = null;      // touch id rotating the camera
+    let originX = 0, originY = 0;
+    const RANGE = 46;      // px of drag = full speed
+
+    const showJoy = (x, y) => {
+      joy.style.display = 'block';
+      joy.style.left = (x - 55) + 'px';
+      joy.style.top = (y - 55) + 'px';
+      knob.style.transform = 'translate(0px, 0px)';
     };
-    const setKnob = (dx, dy) => {
-      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+    const hideJoy = () => {
+      joy.style.display = 'none';
+      this.moveX = this.moveZ = 0;
     };
 
-    stick.addEventListener('touchstart', (e) => {
-      const t = e.changedTouches[0];
-      joyId = t.identifier;
-      e.preventDefault();
-    }, { passive: false });
+    const onStart = (e) => {
+      for (const t of e.changedTouches) {
+        const el = document.elementFromPoint(t.clientX, t.clientY);
+        if (el && (el.closest('#chat') || el.closest('#jumpbtn') || el.closest('#chatbtn') || el.closest('a') || el.closest('button') || el.closest('input'))) continue;
+        if (t.clientX < window.innerWidth * 0.5 && joyId === null) {
+          // dynamic joystick spawns at the touch point
+          joyId = t.identifier;
+          originX = t.clientX; originY = t.clientY;
+          showJoy(originX, originY);
+          e.preventDefault();
+        } else if (camId === null) {
+          camId = t.identifier;
+          this._cpx = t.clientX; this._cpy = t.clientY;
+        }
+      }
+    };
 
-    window.addEventListener('touchmove', (e) => {
+    const onMove = (e) => {
       for (const t of e.changedTouches) {
         if (t.identifier === joyId) {
-          const c = rectCenter();
-          let dx = t.clientX - c.x, dy = t.clientY - c.y;
+          let dx = t.clientX - originX, dy = t.clientY - originY;
           const len = Math.hypot(dx, dy);
-          const max = c.rad * 0.7;
-          if (len > max) { dx = dx / len * max; dy = dy / len * max; }
-          setKnob(dx, dy);
-          this.moveX = dx / max;
-          this.moveZ = dy / max;
-        } else if (t.identifier === this._camId) {
+          // NOT trapped: if you drag past the ring, the ring follows you
+          if (len > RANGE) {
+            const over = len - RANGE;
+            originX += (dx / len) * over;
+            originY += (dy / len) * over;
+            joy.style.left = (originX - 55) + 'px';
+            joy.style.top = (originY - 55) + 'px';
+            dx = t.clientX - originX; dy = t.clientY - originY;
+          }
+          knob.style.transform = `translate(${dx}px, ${dy}px)`;
+          this.moveX = clamp(dx / RANGE, -1, 1);
+          this.moveZ = clamp(dy / RANGE, -1, 1);
+          e.preventDefault();
+        } else if (t.identifier === camId) {
           this.camYaw -= (t.clientX - this._cpx) * 0.006;
           this.camPitch = clamp(this.camPitch + (t.clientY - this._cpy) * 0.006, -0.2, 1.25);
           this._cpx = t.clientX; this._cpy = t.clientY;
         }
       }
-    }, { passive: false });
+    };
 
-    const endJoy = (e) => {
+    const onEnd = (e) => {
       for (const t of e.changedTouches) {
-        if (t.identifier === joyId) {
-          joyId = null; this.moveX = this.moveZ = 0; setKnob(0, 0);
-        }
-        if (t.identifier === this._camId) this._camId = null;
+        if (t.identifier === joyId) { joyId = null; hideJoy(); }
+        if (t.identifier === camId) camId = null;
       }
     };
-    window.addEventListener('touchend', endJoy);
-    window.addEventListener('touchcancel', endJoy);
 
-    // camera drag on the canvas (right side of screen)
-    this._camId = null;
-    canvas.addEventListener('touchstart', (e) => {
-      for (const t of e.changedTouches) {
-        if (this._camId === null && t.identifier !== joyId) {
-          this._camId = t.identifier;
-          this._cpx = t.clientX; this._cpy = t.clientY;
-        }
-      }
-    }, { passive: true });
+    window.addEventListener('touchstart', onStart, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onEnd);
+    window.addEventListener('touchcancel', onEnd);
 
     jumpBtn.addEventListener('touchstart', (e) => { this.jump = true; e.preventDefault(); }, { passive: false });
     jumpBtn.addEventListener('touchend', () => { this.jump = false; });
   }
 
-  // combined movement intent in local space (-1..1)
   intent() {
     let ix = this.moveX, iz = this.moveZ;
     if (this.keys.KeyW || this.keys.ArrowUp) iz -= 1;

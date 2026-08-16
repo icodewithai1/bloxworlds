@@ -257,6 +257,91 @@ body.game { overflow: hidden; background: #000; touch-action: none;
   -webkit-user-select: none; user-select: none; }
 #c { display: block; width: 100vw; height: 100vh; touch-action: none; }
 
+/* ---------- hub splash ---------- */
+#splash {
+  position: fixed;
+  inset: 0;
+  background: #232527;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: opacity .5s;
+}
+#splash.done { opacity: 0; pointer-events: none; }
+#splash img { width: 84px; height: 84px; border-radius: 18px; animation: loadpulse 1.3s ease-in-out infinite; }
+.splash-title { color: #fff; font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+.splash-title span { color: #00a2ff; }
+.splash-sub { color: #9aa0a6; font-size: 13px; }
+.splash-bar {
+  width: 200px; height: 4px;
+  background: #3a3e42; border-radius: 2px;
+  overflow: hidden; margin-top: 12px;
+}
+.splash-bar i {
+  display: block; height: 100%; width: 45%;
+  background: #00a2ff; border-radius: 2px;
+  animation: loadslide 1s ease-in-out infinite;
+}
+
+/* ---------- auth ---------- */
+#auth {
+  position: fixed;
+  inset: 0;
+  background: rgba(20,22,24,.8);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.auth-card {
+  width: min(360px, 94vw);
+  background: #fff;
+  border-radius: 14px;
+  padding: 22px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.5);
+}
+.auth-logo { width: 52px; height: 52px; border-radius: 12px; display: block; margin: 0 auto 12px; }
+.auth-tabs {
+  display: flex;
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 16px;
+}
+.auth-tabs button {
+  flex: 1;
+  background: none;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sub);
+  padding: 10px;
+  cursor: pointer;
+}
+.auth-tabs button.on { color: var(--ink); box-shadow: inset 0 -2px 0 var(--dark); }
+.auth-fields label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+  margin: 10px 0 4px;
+}
+.auth-fields input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+}
+.auth-fields input:focus { border-color: var(--blue); }
+#a-error { color: #d32f2f; font-size: 13px; font-weight: 600; min-height: 18px; margin-top: 8px; }
+.btn.wide { width: 100%; margin-top: 6px; }
+.auth-note { font-size: 11px; color: var(--sub); margin-top: 12px; line-height: 1.5; text-align: center; }
+
 /* ---------- loading screen ---------- */
 #loadscreen {
   position: fixed;

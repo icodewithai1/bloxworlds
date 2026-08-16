@@ -10,6 +10,40 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <!-- splash screen -->
+  <div id="splash">
+    <img src="assets/icon.png" alt="">
+    <div class="splash-title">Blox<span>Worlds</span></div>
+    <div class="splash-sub">Serverless multiplayer worlds</div>
+    <div class="splash-bar"><i></i></div>
+  </div>
+
+  <!-- auth (sign up / log in) -->
+  <div id="auth" style="display:none">
+    <div class="auth-card">
+      <img class="auth-logo" src="assets/icon.png" alt="">
+      <div class="auth-tabs">
+        <button id="tab-login" class="on">Log In</button>
+        <button id="tab-signup">Sign Up</button>
+      </div>
+      <div class="auth-fields">
+        <label>Username</label>
+        <input id="a-user" maxlength="20" autocomplete="username" placeholder="Builderman123">
+        <label>Password</label>
+        <input id="a-pass" type="password" maxlength="64" autocomplete="current-password" placeholder="••••••">
+        <div id="signup-extra" style="display:none">
+          <label>Birthdate</label>
+          <input id="a-birth" type="date">
+        </div>
+        <div id="a-error"></div>
+        <button class="btn wide" id="a-submit">Log In</button>
+        <button class="btn ghost wide" id="a-guest">Play as Guest</button>
+      </div>
+      <div class="auth-note">Accounts are stored on this device only — BloxWorlds is fully
+        peer-to-peer with no account server. Passwords are salted &amp; hashed, never saved as text.</div>
+    </div>
+  </div>
+
   <nav class="nav">
     <div class="nav-inner">
       <a class="brand" href="index.html">

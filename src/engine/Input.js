@@ -37,7 +37,7 @@ export class Input {
       px = e.clientX; py = e.clientY;
     });
     window.addEventListener('wheel', (e) => {
-      this.camDist = clamp(this.camDist + Math.sign(e.deltaY) * 1.2, 4, 18);
+      this.camDist = clamp(this.camDist + Math.sign(e.deltaY) * 1.2, 1.2, 18);
     });
 
     if (this.isTouch) this._setupTouch(canvas);

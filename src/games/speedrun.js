@@ -292,7 +292,7 @@ chatin.addEventListener('keydown', (e) => {
   e.stopPropagation();
   if (e.code === 'Enter') {
     const v = chatin.value.trim().slice(0, 140);
-    if (v) { chatLine(db.name, v); net.sendChat(v); }
+    if (v) { chatLine(db.name, v); player.avatar.say(v); net.sendChat(v); }
     closeChat();
   } else if (e.code === 'Escape') closeChat();
 });

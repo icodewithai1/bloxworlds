@@ -120,7 +120,7 @@ export class Player {
     // sync avatar
     this.avatar.group.position.copyFrom(this.pos);
     this.avatar.group.rotation.y = this.yaw;
-    this.avatar.animate(dt, this.speed, this.grounded);
+    this.avatar.animate(dt, this.speed, this.grounded, this.vel.y);
   }
 
   _spinnerHit(q) {
@@ -151,11 +151,36 @@ export class Player {
 
   updateCamera(input) {
     const cam = this.engine.camera;
-    const cd = input.camDist, cp = input.camPitch, cy = input.camYaw;
+    const cp = input.camPitch, cy = input.camYaw;
+    let cd = input.camDist;
+
+    // --- camera collision: ray from head to desired cam pos, pull in if blocked
+    const head = { x: this.pos.x, y: this.pos.y + 1.8, z: this.pos.z };
+    const dirX = Math.sin(cy) * Math.cos(cp), dirY = Math.sin(cp), dirZ = Math.cos(cy) * Math.cos(cp);
+    for (const q of this.world.parts) {
+      if (q.kind === 'deco' || !q.half) continue;
+      const c = q.mesh.position;
+      // step along the ray, shrink cd at first hit
+      for (let t = 1; t < cd; t += 0.5) {
+        const px = head.x + dirX * t, py = head.y + dirY * t, pz = head.z + dirZ * t;
+        if (Math.abs(px - c.x) < q.half.x + 0.3 && Math.abs(py - c.y) < q.half.y + 0.3 && Math.abs(pz - c.z) < q.half.z + 0.3) {
+          cd = Math.min(cd, Math.max(t - 0.4, 0.6));
+          break;
+        }
+      }
+    }
+
+    // --- first person: hide body so you never see inside it
+    const firstPerson = cd < 1.6;
+    if (this._fpVis !== firstPerson) {
+      this._fpVis = firstPerson;
+      this.avatar.setVisible(!firstPerson);
+    }
+
     cam.position.set(
-      this.pos.x + Math.sin(cy) * Math.cos(cp) * cd,
-      this.pos.y + 1.8 + Math.sin(cp) * cd,
-      this.pos.z + Math.cos(cy) * Math.cos(cp) * cd
+      head.x + dirX * cd,
+      head.y + dirY * cd,
+      head.z + dirZ * cd
     );
     cam.setTarget(new Vector3(this.pos.x, this.pos.y + 1.6, this.pos.z));
   }

@@ -14,3 +14,4 @@ export { Effects } from './Effects.js';
 export { AntiCheat } from './AntiCheat.js';
 export { CLOTHES } from './Avatar.js';
 export * as Account from './Account.js';
+export { Animator, AnimationClip, makeR6Clips } from './Rig.js';

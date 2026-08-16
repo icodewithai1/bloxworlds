@@ -34,12 +34,14 @@ export class Network {
     this.onChat = null;
     this.onEvent = null;
     this.dead = false;
+    this._initLocalBus(gameId);
 
     try {
       this.room = joinRoom({ appId: APP_ID }, gameId);
     } catch (e) {
-      console.warn('[BloxWorlds] P2P unavailable:', e);
-      this.dead = true;
+      console.warn('[BloxWorlds] P2P unavailable (local-tab multiplayer still on):', e);
+      this.dead = false;
+      this._noRtc = true;
       return;
     }
 
@@ -95,14 +97,60 @@ export class Network {
     });
   }
 
+  _initLocalBus(roomId) {
+    // Same-device multiplayer: tabs sync via BroadcastChannel even when
+    // P2P relays are unreachable. Remote peers still use WebRTC.
+    try {
+      this._bc = new BroadcastChannel('bloxworlds:' + roomId);
+      this._bcId = 'local-' + Math.random().toString(36).slice(2, 9);
+      this._bc.onmessage = (ev) => {
+        const m = ev.data;
+        if (!m || m.from === this._bcId) return;
+        if (m.kind === 'profile') {
+          const known = this.peers.has(m.from);
+          this.peers.set(m.from, { name: sanitizeName(m.profile.name), look: sanitizeLook(m.profile.look) });
+          if (!known) {
+            this.onPeerJoin && this.onPeerJoin(m.from, this.peers.get(m.from));
+            // introduce ourselves back
+            if (this._profile) this._bc.postMessage({ from: this._bcId, kind: 'profile', profile: this._profile });
+          }
+        } else if (m.kind === 'state') {
+          if (!this.peers.has(m.from)) return;
+          this.onState && this.onState(m.from, m.p, m.g, m.s);
+        } else if (m.kind === 'chat') {
+          if (this.peers.has(m.from)) this.onChat && this.onChat(m.from, sanitizeChat(m.m));
+        } else if (m.kind === 'event') {
+          if (this.peers.has(m.from)) this.onEvent && this.onEvent(m.from, m.e.k, m.e);
+        } else if (m.kind === 'leave') {
+          const p = this.peers.get(m.from);
+          this.peers.delete(m.from);
+          if (p) this.onPeerLeave && this.onPeerLeave(m.from, p);
+        }
+      };
+      window.addEventListener('beforeunload', () => {
+        try { this._bc.postMessage({ from: this._bcId, kind: 'leave' }); } catch (e) {}
+      });
+    } catch (e) { this._bc = null; }
+  }
+
   join(name, look) {
     this._profile = { name: sanitizeName(name), look };
+    if (this._bc) { try { this._bc.postMessage({ from: this._bcId, kind: 'profile', profile: this._profile }); } catch (e) {} }
+    if (this._noRtc) return;
     if (this.dead) return;
     try { this._profileA.send(this._profile); } catch (e) {}
   }
 
   sendState(pos, yaw, grounded, speed) {
-    if (this.dead || this.peers.size === 0) return;
+    if (this._bc) {
+      try {
+        this._bc.postMessage({ from: this._bcId, kind: 'state',
+          p: [+pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), +yaw.toFixed(2)],
+          g: grounded ? 1 : 0, s: +speed.toFixed(1) });
+      } catch (e) {}
+    }
+    if (this._noRtc) return;
+    if (this.dead) return;
     try {
       this._stateA.send({
         p: [+pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), +yaw.toFixed(2)],
@@ -113,11 +161,15 @@ export class Network {
   }
 
   sendChat(text) {
+    if (this._bc) { try { this._bc.postMessage({ from: this._bcId, kind: 'chat', m: sanitizeChat(text) }); } catch (e) {} }
+    if (this._noRtc) return;
     if (this.dead) return;
     try { this._chatA.send(sanitizeChat(text)); } catch (e) {}
   }
 
   sendEvent(kind, data = {}) {
+    if (this._bc) { try { this._bc.postMessage({ from: this._bcId, kind: 'event', e: { k: kind, ...data } }); } catch (e) {} }
+    if (this._noRtc) return;
     if (this.dead) return;
     try { this._eventA.send({ k: kind, ...data }); } catch (e) {}
   }

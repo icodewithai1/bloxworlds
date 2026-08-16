@@ -1,14 +1,19 @@
-// BloxWorlds Engine — Avatar (Babylon.js)
-// Classic R6 build: 2×2×1 block torso, full 1×2×1 block arms & legs,
-// clean CYLINDER head with flat top, face decal on the front, and
-// low-profile hair shells that hug the head.
+// BloxWorlds Engine — Avatar: legal from-scratch R6-style rig on Blox3D.
+// Exact classic proportions (in studs, 1 stud = 0.5 units):
+//   Torso 2 x 2 x 1  -> 1.0 x 1.0 x 0.5
+//   Arms  1 x 2 x 1  -> 0.5 x 1.0 x 0.5, hanging flush at torso sides
+//   Legs  1 x 2 x 1  -> 0.5 x 1.0 x 0.5
+//   Head  cylinder ~1.2 wide with flat top + classic face decal
+// Six joints (Motor6D-style): neck, lSh, rSh, lHip, rHip (+root).
+// Animated by the Rig/Animator engine (idle/walk/run/jump/fall clips).
 import {
   MeshBuilder, StandardMaterial, DynamicTexture, Texture, Color3, TransformNode, Mesh, Vector3
 } from './blox3d.js';
-
-// real 2D clothing textures; id 0 = flat colors
-export const CLOTHES = [null, 'shirt_blue', 'shirt_red', 'shirt_green'];
 import { clamp, lerp } from './Engine.js';
+import { Animator, makeR6Clips } from './Rig.js';
+
+export const CLOTHES = [null, 'shirt_blue', 'shirt_red', 'shirt_green'];
+export const HAIR_STYLES = ['bacon', 'swoosh', 'spiky', 'bob', 'cap', 'none'];
 
 const hex = (c) => '#' + (c >>> 0).toString(16).padStart(6, '0');
 function shadeC(c, f) {
@@ -20,23 +25,27 @@ function shadeC(c, f) {
 const c3 = (c) => new Color3(((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255);
 
 function flatMat(scene, color) {
-  const m = new StandardMaterial('am' + color + Math.random(), scene);
+  const m = new StandardMaterial('am', scene);
   m.diffuseColor = c3(color);
   m.specularColor = new Color3(0.03, 0.03, 0.03);
   return m;
 }
 
-function texMat(scene, w, h, draw) {
-  const tex = new DynamicTexture('at' + Math.random(), { width: w, height: h }, scene, true);
-  draw(tex.getContext());
-  tex.update(false);
-  const m = new StandardMaterial('atm' + Math.random(), scene);
-  m.diffuseTexture = tex;
-  m.specularColor = new Color3(0.03, 0.03, 0.03);
-  return m;
+// ---------- decals ----------
+function drawFace(ctx) {
+  ctx.clearRect(0, 0, 256, 256);
+  const cx = 128;
+  ctx.fillStyle = '#151515';
+  ctx.beginPath(); ctx.ellipse(cx - 44, 108, 12, 17, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 44, 108, 12, 17, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,.85)';
+  ctx.beginPath(); ctx.ellipse(cx - 48, 102, 3.8, 5, 0, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 40, 102, 3.8, 5, 0, 0, 7); ctx.fill();
+  ctx.strokeStyle = '#151515';
+  ctx.lineWidth = 11; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.arc(cx, 120, 40, 0.45, Math.PI - 0.45); ctx.stroke();
 }
 
-// ---------- textures ----------
 function drawTorso(ctx, jacket, shirt, graphic) {
   ctx.fillStyle = hex(jacket); ctx.fillRect(0, 0, 128, 128);
   ctx.fillStyle = hex(shirt); ctx.fillRect(30, 0, 68, 128);
@@ -62,128 +71,91 @@ function drawDenim(ctx, pants) {
     ctx.globalAlpha = 0.35;
     ctx.fillRect((Math.random() * 64) | 0, (Math.random() * 64) | 0, 1, Math.random() < 0.3 ? 2 : 1);
   }
-  ctx.globalAlpha = 0.5;
-  ctx.fillStyle = hex(shadeC(pants, 0.55));
-  ctx.fillRect(0, 0, 2, 64); ctx.fillRect(62, 0, 2, 64);
   ctx.globalAlpha = 1;
 }
 
-// face decal drawn on a transparent plane mounted on the front of the head —
-// no cylinder UV guesswork, always faces the same way as the torso front.
-function drawFace(ctx) {
-  ctx.clearRect(0, 0, 256, 256);
-  const cx = 128;
-  ctx.fillStyle = '#151515';
-  ctx.beginPath(); ctx.ellipse(cx - 44, 108, 12, 17, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + 44, 108, 12, 17, 0, 0, 7); ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,.85)';
-  ctx.beginPath(); ctx.ellipse(cx - 48, 102, 3.8, 5, 0, 0, 7); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + 40, 102, 3.8, 5, 0, 0, 7); ctx.fill();
-  ctx.strokeStyle = '#151515';
-  ctx.lineWidth = 11; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(cx, 120, 40, 0.45, Math.PI - 0.45); ctx.stroke();
-}
-
-// ---------- hair: thin shells hugging the cylinder ----------
-const HEAD_R = 0.4;
-export const HAIR_STYLES = ['bacon', 'swoosh', 'spiky', 'bob', 'cap'];
-
+// ---------- hair (thin shells hugging the head, r=0.6 cylinder) ----------
+const HEAD_R = 0.6;
 function buildHair(scene, parent, style, color) {
+  if (style === 'none') return null;
   const m1 = flatMat(scene, color);
   const m2 = flatMat(scene, shadeC(color, 1.32));
   m1.backFaceCulling = false;
   m2.backFaceCulling = false;
   const g = new TransformNode('hair', scene);
   g.parent = parent;
-  const made = [];
 
-  const cap = (h = 0.06, r = HEAD_R + 0.015, m = m1) => {
+  const cap = (h = 0.08, r = HEAD_R + 0.02, m = m1) => {
     const c = MeshBuilder.CreateCylinder('hcap', { diameter: r * 2, height: h, tessellation: 24 }, scene);
-    c.material = m;
-    c.parent = g;
+    c.material = m; c.parent = g;
     c.position.y = 0.3 + h / 2;
-    made.push(c);
     return c;
   };
-  // curved shell approximated by small angled boxes hugging the head.
-  // centerDeg 0 = face direction (+z local), positive = clockwise viewed from above.
-  // Fully deterministic — no engine arc-orientation guesswork.
-  const shell = (centerDeg, widthDeg, top, bottom, m = m1, rOff = 0.045) => {
+  const shell = (centerDeg, widthDeg, top, bottom, m = m1, rOff = 0.05) => {
     const r = HEAD_R + rOff;
     const h = top - bottom;
-    const segAngle = 18; // degrees per box segment
+    const segAngle = 18;
     const n = Math.max(1, Math.round(widthDeg / segAngle));
-    const segW = 2 * r * Math.tan((widthDeg / n) * Math.PI / 360) + 0.015;
+    const segW = 2 * r * Math.tan((widthDeg / n) * Math.PI / 360) + 0.02;
     for (let i = 0; i < n; i++) {
       const aDeg = centerDeg - widthDeg / 2 + (i + 0.5) * (widthDeg / n);
       const a = aDeg * Math.PI / 180;
-      const b = MeshBuilder.CreateBox('hs', { width: segW, height: h, depth: 0.06 }, scene);
-      b.material = m;
-      b.parent = g;
+      const b = MeshBuilder.CreateBox('hs', { width: segW, height: h, depth: 0.07 }, scene);
+      b.material = m; b.parent = g;
       b.position.set(Math.sin(a) * r, bottom + h / 2, Math.cos(a) * r);
       b.rotation.y = a;
-      made.push(b);
     }
   };
   const cone = (r, h, x, y, z, rx = 0, rz = 0, m = m1) => {
     const c = MeshBuilder.CreateCylinder('hc', { diameterTop: 0, diameterBottom: r * 2, height: h, tessellation: 8 }, scene);
-    c.material = m;
-    c.parent = g;
+    c.material = m; c.parent = g;
     c.position.set(x, y, z);
     c.rotation.x = rx; c.rotation.z = rz;
-    made.push(c);
-    return c;
   };
 
   switch (style) {
     case 'bacon':
-      cap(0.07);
-      shell(0, 40, 0.30, 0.16, m1);
-      shell(-32, 22, 0.30, 0.20, m2);
-      shell(32, 22, 0.30, 0.18, m1);
-      shell(90, 50, 0.30, 0.08, m2);
-      shell(-90, 50, 0.30, 0.10, m1);
-      shell(180, 90, 0.30, 0.02, m1);
+      cap(0.09);
+      shell(0, 40, 0.32, 0.14, m1);
+      shell(-32, 22, 0.32, 0.2, m2);
+      shell(32, 22, 0.32, 0.17, m1);
+      shell(90, 50, 0.32, 0.05, m2);
+      shell(-90, 50, 0.32, 0.08, m1);
+      shell(180, 90, 0.32, 0, m1);
       break;
     case 'swoosh':
-      cap(0.07);
-      shell(-16, 56, 0.30, 0.14, m1);
-      shell(26, 24, 0.30, 0.20, m2);
-      shell(112, 62, 0.30, 0.06, m1);
-      shell(-112, 62, 0.30, 0.06, m2);
-      cone(0.07, 0.2, -0.2, 0.4, 0.26, 1.1, 0.55, m2);
+      cap(0.09);
+      shell(-16, 56, 0.32, 0.12, m1);
+      shell(26, 24, 0.32, 0.19, m2);
+      shell(112, 62, 0.32, 0.03, m1);
+      shell(-112, 62, 0.32, 0.03, m2);
+      cone(0.1, 0.28, -0.3, 0.42, 0.38, 1.1, 0.55, m2);
       break;
     case 'spiky':
-      cap(0.06);
+      cap(0.08);
       for (let i = 0; i < 7; i++) {
         const a = (i / 7) * Math.PI * 2;
-        cone(0.07, 0.2, Math.cos(a) * 0.22, 0.4, Math.sin(a) * 0.22,
+        cone(0.1, 0.26, Math.cos(a) * 0.32, 0.42, Math.sin(a) * 0.32,
           Math.sin(a) * 0.4, -Math.cos(a) * 0.4, i % 2 ? m2 : m1);
       }
-      cone(0.08, 0.24, 0, 0.44, 0, 0, 0, m2);
+      cone(0.11, 0.3, 0, 0.48, 0, 0, 0, m2);
       break;
     case 'bob':
-      cap(0.08);
-      shell(0, 60, 0.30, 0.14, m1);
-      shell(90, 52, 0.30, -0.22, m1);
-      shell(-90, 52, 0.30, -0.22, m1);
-      shell(180, 105, 0.30, -0.26, m2);
+      cap(0.1);
+      shell(0, 60, 0.32, 0.12, m1);
+      shell(90, 52, 0.32, -0.3, m1);
+      shell(-90, 52, 0.32, -0.3, m1);
+      shell(180, 105, 0.32, -0.34, m2);
       break;
     case 'cap': {
-      cap(0.09, HEAD_R + 0.03, m1);
-      shell(180, 190, 0.30, 0.14, m1, 0.035);
-      const brim = MeshBuilder.CreateBox('brim', { width: 0.42, height: 0.04, depth: 0.24 }, scene);
-      brim.material = m1;
-      brim.parent = g;
-      brim.position.set(0, 0.31, HEAD_R + 0.1);
-      made.push(brim);
-      const btn = MeshBuilder.CreateSphere('btn', { diameter: 0.08, segments: 6 }, scene);
-      btn.material = m2;
-      btn.parent = g;
-      btn.position.y = 0.41;
-      made.push(btn);
-      shell(115, 34, 0.14, 0.02, m2);
-      shell(-115, 34, 0.14, 0.02, m2);
+      cap(0.11, HEAD_R + 0.04, m1);
+      shell(180, 190, 0.32, 0.12, m1, 0.055);
+      const brim = MeshBuilder.CreateBox('brim', { width: 0.62, height: 0.05, depth: 0.34 }, scene);
+      brim.material = m1; brim.parent = g;
+      brim.position.set(0, 0.34, HEAD_R + 0.14);
+      const btn = MeshBuilder.CreateSphere('btn', { diameter: 0.1, segments: 6 }, scene);
+      btn.material = m2; btn.parent = g;
+      btn.position.y = 0.46;
       break;
     }
   }
@@ -194,7 +166,8 @@ export class Avatar {
   constructor(engine, look = {}) {
     const scene = engine.scene;
     this.scene = scene;
-    const skin = look.skin ?? 0xf3f3f3;
+    // default look = classic gray (like the reference: pale gray blocky guest)
+    const skin = look.skin ?? 0xd5d8dd;
     const shirt = look.shirt ?? 0x1f7fd1;
     const jacket = look.jacket ?? 0x17181a;
     const pants = look.pants ?? 0x2a332a;
@@ -203,39 +176,36 @@ export class Avatar {
 
     const mSkin = flatMat(scene, skin);
     const mJacket = flatMat(scene, jacket);
-    const mDenim = texMat(scene, 64, 64, (ctx) => drawDenim(ctx, pants));
+    const denimTex = new DynamicTexture('denim', { width: 64, height: 64 }, scene);
+    drawDenim(denimTex.getContext(), pants);
+    denimTex.update();
+    const mDenim = new StandardMaterial('mdenim', scene);
+    mDenim.diffuseTexture = denimTex;
+    mDenim.specularColor = new Color3(0.03, 0.03, 0.03);
     const mShoe = flatMat(scene, 0xf5f5f5);
     const mSole = flatMat(scene, 0x22252a);
 
     const root = new TransformNode('avatar', scene);
     this.group = root;
     this.meshes = [];
-
     const reg = (m) => { this.meshes.push(m); return m; };
 
-    // ---- torso: multi-material box via faceUV on a textured atlas
-    // simpler: one box with torso texture on front/back, jacket color sides
-    const torsoTex = new DynamicTexture('torso', { width: 128, height: 128 }, scene, true);
+    // ---- R6 Torso 1.0 x 1.0 x 0.5 spanning y 1.0..2.0
+    const torsoTex = new DynamicTexture('torso', { width: 128, height: 128 }, scene);
     drawTorso(torsoTex.getContext(), jacket, shirt, true);
-    torsoTex.update(false);
+    torsoTex.update();
     const mTorso = new StandardMaterial('mtorso', scene);
     mTorso.diffuseTexture = torsoTex;
     mTorso.specularColor = new Color3(0.03, 0.03, 0.03);
-    // faceUV: front face gets full texture; others get the jacket-colored edge strip
-    const edge = [0, 0, 0.05, 1]; // a strip of jacket color at texture left
-    const full = [0, 0, 1, 1];
-    // Babylon box faces: 0=front(+z), 1=back(-z), 2/3=sides, 4=top, 5=bottom
+    const edge = { x: 0, y: 0, z: 0.05, w: 1 };
+    const full = { x: 0, y: 0, z: 1, w: 1 };
     const torso = reg(MeshBuilder.CreateBox('torso', {
       width: 1.0, height: 1.0, depth: 0.5,
-      faceUV: [
-        full,          // front (+z) — shirt with graphic
-        full,          // back
-        edge, edge, edge, edge
-      ].map((a) => ({ x: a[0], y: a[1], z: a[2], w: a[3] }))
+      faceUV: [full, full, edge, edge, edge, edge]
     }, scene));
     const clothesId = CLOTHES[look.clothes | 0] || null;
     if (clothesId) {
-      const cm = new StandardMaterial('mclothes' + Math.random(), scene);
+      const cm = new StandardMaterial('mclothes', scene);
       cm.diffuseTexture = new Texture('assets/clothes/' + clothesId + '.jpg', scene);
       cm.specularColor = new Color3(0.03, 0.03, 0.03);
       torso.material = cm;
@@ -245,47 +215,41 @@ export class Avatar {
     torso.parent = root;
     torso.position.y = 1.5;
 
-    // ---- head: clean plain-skin cylinder with a flat top
+    // ---- Head: cylinder 1.2 wide, 0.6 tall on neck joint
     const neck = new TransformNode('neck', scene);
     neck.parent = root;
     neck.position.y = 2.0;
     const head = reg(MeshBuilder.CreateCylinder('head', {
-      diameter: 0.8, height: 0.6, tessellation: 28
+      diameter: HEAD_R * 2, height: 0.6, tessellation: 28
     }, scene));
     head.material = mSkin;
     head.parent = neck;
-    head.position.y = 0.32;
-    this.headNode = head;
+    head.position.y = 0.31;
 
-    // ---- face decal: transparent plane curved onto the front of the cylinder
-    const faceTex = new DynamicTexture('face', { width: 256, height: 256 }, scene, true);
+    // face decal plane on the front
+    const faceTex = new DynamicTexture('face', { width: 256, height: 256 }, scene);
     drawFace(faceTex.getContext());
-    faceTex.update(false);
+    faceTex.update();
     faceTex.hasAlpha = true;
     const mFace = new StandardMaterial('mface', scene);
     mFace.diffuseTexture = faceTex;
     mFace.useAlphaFromDiffuseTexture = true;
     mFace.specularColor = new Color3(0, 0, 0);
     mFace.backFaceCulling = false;
-    const face = MeshBuilder.CreatePlane('facep', {
-      width: 0.62, height: 0.58, sideOrientation: Mesh.DOUBLESIDE
-    }, scene);
+    const face = MeshBuilder.CreatePlane('facep', { width: 0.82, height: 0.62, sideOrientation: Mesh.DOUBLESIDE }, scene);
     face.material = mFace;
     face.parent = neck;
-    // flat decal floating just in front of the cylinder — classic face look
-    face.position.set(0, 0.32, HEAD_R + 0.012);
-    this.faceMesh = face;
+    face.position.set(0, 0.31, HEAD_R + 0.015);
 
-    // ---- hair
     const hairMount = new TransformNode('hairmount', scene);
     hairMount.parent = neck;
-    hairMount.position.y = 0.32;
+    hairMount.position.y = 0.31;
     buildHair(scene, hairMount, style, hairC);
     hairMount.getChildMeshes().forEach((m) => this.meshes.push(m));
 
-    // ---- arms: full R6 blocks
+    // ---- Arms: 0.5 x 1.0 x 0.5, shoulder joint at torso top corner
     const makeArm = (side) => {
-      const sh = new TransformNode('sh', scene);
+      const sh = new TransformNode(side < 0 ? 'lSh' : 'rSh', scene);
       sh.parent = root;
       sh.position.set(side * 0.75, 1.95, 0);
       const arm = reg(MeshBuilder.CreateBox('arm', { width: 0.5, height: 1.0, depth: 0.5 }, scene));
@@ -296,12 +260,12 @@ export class Avatar {
       hand.material = mSkin;
       hand.parent = sh;
       hand.position.y = -0.98;
-      return { sh };
+      return sh;
     };
 
-    // ---- legs: full R6 blocks + sneakers
+    // ---- Legs: 0.5 x 1.0 x 0.5 from hip joints
     const makeLeg = (side) => {
-      const hip = new TransformNode('hip', scene);
+      const hip = new TransformNode(side < 0 ? 'lHip' : 'rHip', scene);
       hip.parent = root;
       hip.position.set(side * 0.25, 1.0, 0);
       const leg = reg(MeshBuilder.CreateBox('leg', { width: 0.5, height: 1.0, depth: 0.5 }, scene));
@@ -316,40 +280,46 @@ export class Avatar {
       sole.material = mSole;
       sole.parent = hip;
       sole.position.set(0, -1.02, 0.05);
-      return { hip };
+      return hip;
     };
 
-    this.neck = neck;
-    this.la = makeArm(-1); this.ra = makeArm(1);
-    this.ll = makeLeg(-1); this.rl = makeLeg(1);
-    this.la.sh.rotation.z = 0.06;
-    this.ra.sh.rotation.z = -0.06;
-    this.phase = Math.random() * 6.28;
-    this._lean = 0;
+    // ---- RIG: named joints -> animation engine
+    const lSh = makeArm(-1), rSh = makeArm(1);
+    const lHip = makeLeg(-1), rHip = makeLeg(1);
+    this.joints = { neck, lSh, rSh, lHip, rHip };
+    this.animator = new Animator(this.joints);
+    for (const clip of makeR6Clips()) this.animator.addClip(clip);
+    this.animator.play('idle');
 
-    // shadows
+    // legacy handles some code still pokes at
+    this.neck = neck;
+    this.la = { sh: lSh }; this.ra = { sh: rSh };
+    this.ll = { hip: lHip }; this.rl = { hip: rHip };
+
+    // ---- chat bubble mount
+    this._bubble = null;
+    this._bubbleTimer = null;
+
     for (const m of this.meshes) engine.addShadows(m);
   }
 
   setNameTag(name) {
     const scene = this.scene;
-    const tex = new DynamicTexture('tag', { width: 512, height: 128 }, scene, true);
+    const tex = new DynamicTexture('tag', { width: 512, height: 128 }, scene);
     const ctx = tex.getContext();
     ctx.clearRect(0, 0, 512, 128);
-    ctx.font = 'bold 56px Arial';
+    ctx.font = '600 44px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(0,0,0,0.45)';
-    const w = Math.min(ctx.measureText(name).width + 44, 500);
-    ctx.beginPath();
-    if (ctx.roundRect) { ctx.roundRect((512 - w) / 2, 20, w, 88, 18); ctx.fill(); }
-    else ctx.fillRect((512 - w) / 2, 20, w, 88);
+    // clean Roblox-like: plain white text w/ soft shadow, no pill
+    ctx.shadowColor = 'rgba(0,0,0,.65)';
+    ctx.shadowBlur = 6;
     ctx.fillStyle = '#fff';
-    ctx.fillText(name, 256, 66);
-    tex.update(false);
+    ctx.fillText(name, 256, 64);
+    tex.update();
     tex.hasAlpha = true;
 
-    const plane = MeshBuilder.CreatePlane('tagp', { width: 3.2, height: 0.8, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    const plane = MeshBuilder.CreatePlane('tagp', { width: 3.0, height: 0.75, sideOrientation: Mesh.DOUBLESIDE }, scene);
     const m = new StandardMaterial('tagm', scene);
     m.diffuseTexture = tex;
     m.emissiveColor = new Color3(1, 1, 1);
@@ -358,54 +328,94 @@ export class Avatar {
     m.backFaceCulling = false;
     plane.material = m;
     plane.parent = this.group;
-    plane.position.y = 3.35;
+    plane.position.y = 3.15;
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
     plane.applyFog = false;
     return this;
   }
 
-  // speed-aware animation: idle sway -> walk -> RUN
-  animate(dt, speed, grounded) {
-    const running = speed > 11;
-    this.phase += dt * (3 + speed * (running ? 1.6 : 2.0));
-    const { la, ra, ll, rl } = this;
-    const s = Math.sin(this.phase);
-    const targetLean = grounded ? clamp(speed * 0.014, 0, 0.38) : 0.1;
-    this._lean = lerp(this._lean, targetLean, dt * 6);
-    this.neck.rotation.x = this._lean * 0.5;
+  // Roblox-style chat bubble above the head (auto-hides)
+  say(text) {
+    const scene = this.scene;
+    if (this._bubble) { this._bubble.dispose(); this._bubble = null; }
+    if (this._bubbleTimer) clearTimeout(this._bubbleTimer);
 
-    if (!grounded) {
-      la.sh.rotation.x = lerp(la.sh.rotation.x, -2.7, dt * 10);
-      ra.sh.rotation.x = lerp(ra.sh.rotation.x, -2.7, dt * 10);
-      ll.hip.rotation.x = lerp(ll.hip.rotation.x, 0.45, dt * 10);
-      rl.hip.rotation.x = lerp(rl.hip.rotation.x, -0.3, dt * 10);
-    } else if (running) {
-      const amp = clamp(speed * 0.075, 0.9, 1.5);
-      la.sh.rotation.x = s * amp;
-      ra.sh.rotation.x = -s * amp;
-      ll.hip.rotation.x = -s * amp;
-      rl.hip.rotation.x = s * amp;
-      la.sh.rotation.z = 0.12; ra.sh.rotation.z = -0.12;
-    } else if (speed > 0.5) {
-      const amp = clamp(speed * 0.09, 0, 0.85);
-      la.sh.rotation.x = s * amp;
-      ra.sh.rotation.x = -s * amp;
-      ll.hip.rotation.x = -s * amp;
-      rl.hip.rotation.x = s * amp;
-      la.sh.rotation.z = lerp(la.sh.rotation.z, 0.06, dt * 8);
-      ra.sh.rotation.z = lerp(ra.sh.rotation.z, -0.06, dt * 8);
-    } else {
-      const t = this.phase * 0.35;
-      la.sh.rotation.x = lerp(la.sh.rotation.x, Math.sin(t) * 0.05, dt * 4);
-      ra.sh.rotation.x = lerp(ra.sh.rotation.x, -Math.sin(t) * 0.05, dt * 4);
-      ll.hip.rotation.x = lerp(ll.hip.rotation.x, 0, dt * 6);
-      rl.hip.rotation.x = lerp(rl.hip.rotation.x, 0, dt * 6);
-      la.sh.rotation.z = lerp(la.sh.rotation.z, 0.06, dt * 4);
-      ra.sh.rotation.z = lerp(ra.sh.rotation.z, -0.06, dt * 4);
+    text = String(text).slice(0, 80);
+    const tex = new DynamicTexture('bub', { width: 512, height: 160 }, scene);
+    const ctx = tex.getContext();
+    ctx.clearRect(0, 0, 512, 160);
+    ctx.font = '500 34px Arial';
+    // measure + wrap up to 2 lines
+    const words = text.split(' ');
+    const lines = [''];
+    for (const w of words) {
+      const t = (lines[lines.length - 1] + ' ' + w).trim();
+      if (ctx.measureText(t).width > 420 && lines[lines.length - 1]) lines.push(w);
+      else lines[lines.length - 1] = t;
+      if (lines.length > 2) { lines[1] += '…'; break; }
     }
+    const wMax = Math.min(Math.max(...lines.map((l) => ctx.measureText(l).width)) + 48, 500);
+    const h = lines.length > 1 ? 118 : 84;
+    const x0 = (512 - wMax) / 2, y0 = (140 - h) / 2;
+    // white rounded bubble + tail
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x0, y0, wMax, h, 16);
+    else ctx.rect(x0, y0, wMax, h);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(236, y0 + h - 2); ctx.lineTo(256, y0 + h + 18); ctx.lineTo(276, y0 + h - 2);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    lines.forEach((l, i) => ctx.fillText(l, 256, y0 + h / 2 + (i - (lines.length - 1) / 2) * 38));
+    tex.update();
+    tex.hasAlpha = true;
+
+    const plane = MeshBuilder.CreatePlane('bubp', { width: 3.4, height: 1.06, sideOrientation: Mesh.DOUBLESIDE }, scene);
+    const m = new StandardMaterial('bubm', scene);
+    m.diffuseTexture = tex;
+    m.emissiveColor = new Color3(1, 1, 1);
+    m.disableLighting = true;
+    m.useAlphaFromDiffuseTexture = true;
+    m.backFaceCulling = false;
+    plane.material = m;
+    plane.parent = this.group;
+    plane.position.y = 3.85;
+    plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
+    plane.applyFog = false;
+    this._bubble = plane;
+    this._bubbleTimer = setTimeout(() => {
+      if (this._bubble) { this._bubble.dispose(); this._bubble = null; }
+    }, 6000);
+  }
+
+  // state machine -> animation engine
+  animate(dt, speed, grounded, velY = 0) {
+    const anim = this.animator;
+    if (!grounded) {
+      anim.play(velY > 1 ? 'jump' : 'fall', { fade: 0.08 });
+    } else if (speed > 11) {
+      anim.play('run', { fade: 0.12 });
+      anim.setRate(clamp(speed / 16, 0.85, 1.6));
+    } else if (speed > 0.5) {
+      anim.play('walk', { fade: 0.12 });
+      anim.setRate(clamp(speed / 9.4, 0.6, 1.4));
+    } else {
+      anim.play('idle', { fade: 0.25 });
+      anim.setRate(1);
+    }
+    anim.update(dt);
+  }
+
+  // hide/show body for first-person or camera-inside-character
+  setVisible(v) {
+    for (const m of this.meshes) m.isVisible = v;
   }
 
   dispose() {
+    if (this._bubbleTimer) clearTimeout(this._bubbleTimer);
     this.group.dispose(false, true);
   }
 }

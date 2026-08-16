@@ -194,6 +194,7 @@ net.onState = (id, p, g, s) => {
 };
 net.onChat = (id, text) => {
   const r = remotes.get(id);
+  if (r) r.avatar.say(text);
   chatLine(r ? r.name : 'Guest', text);
 };
 net.onEvent = (id, kind, e) => {
@@ -265,6 +266,7 @@ chatin.addEventListener('keydown', (e) => {
     const v = chatin.value.trim().slice(0, 140);
     if (v) {
       chatLine(db.name, v);
+      player.avatar.say(v);
       net.sendChat(v);
     }
     closeChat();

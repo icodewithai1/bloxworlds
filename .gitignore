@@ -1,1 +1,5 @@
 node_modules/
+# readable source lives only locally — the public repo ships obfuscated js/ only
+src/
+tools/
+image-search/

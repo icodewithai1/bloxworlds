@@ -2,8 +2,10 @@
 import * as THREE from 'three';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
-  ServerDirectory, makeServerCode, Audio
+  ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome
 } from '../engine/index.js';
+
+injectGameChrome();
 
 const GAME_ID = 'obby';
 
@@ -95,6 +97,8 @@ buildMap();
 const player = new Player(engine, world, { name: db.name, look: db.look });
 db.recordPlay(GAME_ID);
 const runStart = performance.now();
+
+setupGameMenu({ gameName: 'Mega Obby', onRespawn: () => player.respawn(false) });
 
 // ------------------------------------------------------------------ UI
 const hud = document.getElementById('hud');

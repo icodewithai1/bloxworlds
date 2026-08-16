@@ -151,6 +151,9 @@ function buildHair(style, color) {
 
 export const HAIR_STYLES = ['bacon', 'swoosh', 'spiky', 'bob', 'cap'];
 
+// Classic R6 proportions (1 stud = 0.5 units):
+// Torso 2×2×1 studs, Arms 1×2×1, Legs 1×2×1, cylinder head ~1.2 studs wide.
+// Whole-arm swing from the shoulder, whole-leg swing from the hip — like R6.
 export class Avatar {
   constructor(look = {}) {
     const skin = look.skin ?? 0xf3f3f3;
@@ -170,8 +173,7 @@ export class Avatar {
     const mSole = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.6 });
 
     const box = (w, h, d, mat) => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Array.isArray(mat)
-        ? mat : mat);
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
       m.castShadow = m.receiveShadow = true;
       return m;
     };
@@ -183,64 +185,59 @@ export class Avatar {
 
     const root = new THREE.Group();
 
-    // ---- torso: one solid block (jacket sides, shirt front/back)
+    // ---- R6 Torso: 2×2×1 studs (1.0 × 1.0 × 0.5)
     const torso = new THREE.Mesh(
-      new THREE.BoxGeometry(1.0, 1.1, 0.5),
+      new THREE.BoxGeometry(1.0, 1.0, 0.5),
       [mJacket, mJacket, mJacket, mJacket, mShirtF, mShirtB]
     );
     torso.castShadow = torso.receiveShadow = true;
-    torso.position.y = 1.45;
+    torso.position.y = 1.5; // torso spans 1.0 → 2.0
     root.add(torso);
 
-    // ---- head: CYLINDER with wrapped face texture
+    // ---- Head: cylinder (classic look), face wrapped on the side
     const head = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.42, 0.42, 0.62, 20),
-      [mHead, mSkin, mSkin] // side, top, bottom
+      new THREE.CylinderGeometry(0.4, 0.4, 0.6, 20),
+      [mHead, mSkin, mSkin]
     );
     head.castShadow = head.receiveShadow = true;
-    // rotate so the face strip (u≈0.75) points forward (+z)
     head.rotation.y = Math.PI;
     const neck = pivot(0, 2.0, 0);
     neck.add(head);
-    head.position.y = 0.33;
+    head.position.y = 0.32;
     root.add(neck);
 
-    // ---- hair mesh on top of the cylinder
+    // ---- hair mesh hugging the top of the cylinder
     const hair = buildHair(style, hairC);
-    hair.position.y = 0.5;
-    head.add(hair);
-    // undo head yaw so hair faces forward
+    hair.position.y = 0.14; // head half-height 0.3; hair pieces are built around y≈0..0.3
     hair.rotation.y = Math.PI;
+    head.add(hair);
 
-    // ---- arms: a little less wide than torso blocks (single block, shoulder pivot)
+    // ---- R6 Arms: full 1×2×1 blocks swinging from the shoulder
     const makeArm = (side) => {
-      const sh = pivot(side * 0.64, 1.92, 0);
+      const sh = pivot(side * 0.75, 1.95, 0); // shoulder at torso top corner
       const arm = new THREE.Mesh(
-        new THREE.BoxGeometry(0.28, 1.0, 0.28),
-        [mJacket, mJacket, mJacket, mJacket, mJacket, mSkin] // skin bottom (hand)
+        new THREE.BoxGeometry(0.5, 1.0, 0.5),
+        // jacket sleeve top half, skin bottom (classic shirt look via texture split)
+        [mJacket, mJacket, mJacket, mSkin, mJacket, mJacket]
       );
       arm.castShadow = arm.receiveShadow = true;
-      arm.position.y = -0.42;
+      arm.position.y = -0.45;
       sh.add(arm);
-      // little skin hand block
-      const hand = box(0.29, 0.18, 0.29, mSkin);
-      hand.position.y = -0.98;
-      sh.add(hand);
       root.add(sh);
       return { sh };
     };
 
-    // ---- legs: blocks a little less wide, hip pivot + sneaker
+    // ---- R6 Legs: full 1×2×1 blocks from the hip
     const makeLeg = (side) => {
-      const hip = pivot(side * 0.26, 0.95, 0);
-      const leg = box(0.34, 0.82, 0.36, mDenim);
-      leg.position.y = -0.4;
+      const hip = pivot(side * 0.25, 1.0, 0);
+      const leg = box(0.5, 1.0, 0.5, mDenim);
+      leg.position.y = -0.5;
       hip.add(leg);
-      const foot = box(0.35, 0.14, 0.5, mShoe);
-      foot.position.set(0, -0.86, 0.06);
+      const foot = box(0.52, 0.12, 0.62, mShoe);
+      foot.position.set(0, -0.94, 0.05);
       hip.add(foot);
-      const sole = box(0.36, 0.06, 0.52, mSole);
-      sole.position.set(0, -0.945, 0.06);
+      const sole = box(0.54, 0.05, 0.64, mSole);
+      sole.position.set(0, -1.02, 0.05);
       hip.add(sole);
       root.add(hip);
       return { hip };

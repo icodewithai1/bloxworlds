@@ -257,6 +257,94 @@ body.game { overflow: hidden; background: #000; touch-action: none;
   -webkit-user-select: none; user-select: none; }
 #c { display: block; width: 100vw; height: 100vh; touch-action: none; }
 
+/* ---------- loading screen ---------- */
+#loadscreen {
+  position: fixed;
+  inset: 0;
+  background: #232527;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity .55s;
+}
+#loadscreen.done { opacity: 0; pointer-events: none; }
+#loadscreen img { width: 72px; height: 72px; border-radius: 16px; animation: loadpulse 1.4s ease-in-out infinite; }
+@keyframes loadpulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+#load-title { color: #fff; font-size: 24px; font-weight: 800; letter-spacing: -.3px; }
+#load-game { color: #9aa0a6; font-size: 14px; font-weight: 600; }
+#load-bar {
+  width: min(280px, 60vw);
+  height: 5px;
+  background: #3a3e42;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+#load-bar i {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: #00a2ff;
+  border-radius: 3px;
+  animation: loadslide 1.1s ease-in-out infinite;
+}
+@keyframes loadslide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+#load-tip { color: #7c8288; font-size: 12px; margin-top: 14px; }
+
+/* ---------- player list ---------- */
+#topbar-right { margin-left: auto; display: flex; gap: 8px; align-items: flex-start; }
+#conn {
+  background: rgba(0,0,0,.35);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  flex: none;
+}
+#plistbtn {
+  pointer-events: auto;
+  width: 38px; height: 38px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.5);
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  flex: none;
+}
+#plistbtn.active, #plistbtn:active { background: rgba(0,0,0,.75); }
+#plist {
+  display: none;
+  position: fixed;
+  top: 56px; right: 12px;
+  width: 210px;
+  background: rgba(0,0,0,.55);
+  border-radius: 10px;
+  z-index: 7;
+  overflow: hidden;
+}
+#plist-head {
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(255,255,255,.08);
+  letter-spacing: .4px;
+}
+.plist-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 7px 13px;
+  font-size: 13px;
+  color: #e8ecef;
+}
+.plist-row.me .pl-name { color: #7cc7ff; font-weight: 700; }
+.pl-stat { color: #ffd54f; font-weight: 600; }
+
 /* Roblox-style top bar: menu button + hud pill left, connection right */
 #topbar-game {
   position: fixed; top: 0; left: 0; right: 0;
@@ -301,16 +389,6 @@ body.game { overflow: hidden; background: #000; touch-action: none;
 }
 #hud b { color: #fff; font-weight: 700; }
 
-#conn {
-  margin-left: auto;
-  background: rgba(0,0,0,.35);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  flex: none;
-}
 #conn.on { color: #7bd88a; }
 #conn.off { color: #ffcf7d; }
 

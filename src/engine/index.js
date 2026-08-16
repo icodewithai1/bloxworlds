@@ -9,4 +9,5 @@ export { Database } from './Database.js';
 export { ServerDirectory, makeServerCode } from './ServerDirectory.js';
 export { Audio } from './Audio.js';
 export { HAIR_STYLES } from './Avatar.js';
-export { setupGameMenu, injectGameChrome } from './GameUI.js';
+export { setupGameMenu, injectGameChrome, showLoading, setupPlayerList } from './GameUI.js';
+export { Effects } from './Effects.js';

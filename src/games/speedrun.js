@@ -4,10 +4,12 @@
 import * as THREE from 'three';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
-  ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome
+  ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome,
+  showLoading, setupPlayerList, Effects
 } from '../engine/index.js';
 
 injectGameChrome();
+const doneLoading = showLoading('Speedrunners');
 
 const GAME_ID = 'speedrun';
 
@@ -26,6 +28,7 @@ const world = new World(engine);
 const input = new Input(engine.canvas);
 const audio = new Audio();
 audio.playMusic('drive');
+const fx = new Effects(engine);
 
 // ------------------------------------------------------------------ levels
 // Each level: a fast linear course along -Z with hazards; ends with a portal.
@@ -139,6 +142,7 @@ const runStart = performance.now();
 let levelStart = performance.now();
 
 setupGameMenu({ gameName: 'Speedrunners', onRespawn: () => player.respawn(false) });
+const plist = setupPlayerList();
 
 // ------------------------------------------------------------------ UI
 const hud = document.getElementById('hud');
@@ -219,6 +223,7 @@ net.join(db.name, db.look);
 // ------------------------------------------------------------------ level progression
 function nextLevel() {
   audio.play('portal');
+  fx.confetti(player.pos.clone().add(new THREE.Vector3(0, 2, 0)));
   const t = Math.round((performance.now() - levelStart) / 100) / 10;
   level++;
   if (level >= LEVELS) {
@@ -244,7 +249,12 @@ function nextLevel() {
   levelStart = performance.now();
 }
 
-player.onDeath = () => { flash('Wasted!', '#ff5252'); audio.play('death'); db.recordDeath(GAME_ID); };
+player.onDeath = () => {
+  flash('Wasted!', '#ff5252');
+  audio.play('death');
+  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xff5252, 16);
+  db.recordDeath(GAME_ID);
+};
 player.onJump = () => audio.play('jump');
 player.onLand = () => audio.play('land');
 
@@ -304,7 +314,13 @@ engine.addSystem((dt, now) => {
     `<b>${escapeHtml(db.name)}</b><br>` +
     `Level: ${level + 1} / ${LEVELS} — ${LEVEL_THEMES[level].name}<br>` +
     `Time: ${lt}s · Deaths: ${player.deaths}<br>` +
-    `Speed: ${sp.toFixed(0)} · Players: ${remotes.size + 1}`;
+    `Speed: ${sp.toFixed(0)}`;
+
+  plist.update([
+    { name: db.name, stat: 'Lvl ' + (level + 1), me: true },
+    ...[...remotes.values()].map((r) => ({ name: r.name, stat: '' }))
+  ]);
 });
 
 engine.start();
+doneLoading();

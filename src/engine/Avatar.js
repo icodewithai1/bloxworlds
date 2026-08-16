@@ -60,16 +60,22 @@ function denimTexture(pants) {
 // face drawn onto the cylinder head's side (wraps around) — we place features
 // in the strip that faces forward.
 function headTexture(skin) {
-  return canvasTex(256, 128, (ctx) => {
-    ctx.fillStyle = hex(skin); ctx.fillRect(0, 0, 256, 128);
-    // cylinder UV: front of the head ≈ x=192 (three.js cylinder seam at +x, front -z depends on rotation; we rotate head so front strip is centered at x=192)
-    const cx = 192;
-    ctx.fillStyle = '#0b0b0b';
-    ctx.beginPath(); ctx.ellipse(cx - 22, 52, 7, 11, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + 22, 52, 7, 11, 0, 0, 7); ctx.fill();
-    ctx.strokeStyle = '#0b0b0b';
-    ctx.lineWidth = 8; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(cx, 62, 26, 0.35, Math.PI - 0.35); ctx.stroke();
+  return canvasTex(512, 128, (ctx) => {
+    ctx.fillStyle = hex(skin); ctx.fillRect(0, 0, 512, 128);
+    // front strip center (head rotated PI so face points +z)
+    const cx = 384;
+    // classic smiley: round eyes + smile arc
+    ctx.fillStyle = '#151515';
+    ctx.beginPath(); ctx.ellipse(cx - 40, 50, 11, 15, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 40, 50, 11, 15, 0, 0, 7); ctx.fill();
+    // eye shine
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.ellipse(cx - 44, 44, 3.5, 4.5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 36, 44, 3.5, 4.5, 0, 0, 7); ctx.fill();
+    // smile
+    ctx.strokeStyle = '#151515';
+    ctx.lineWidth = 10; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(cx, 58, 42, 0.42, Math.PI - 0.42); ctx.stroke();
   });
 }
 
@@ -247,6 +253,9 @@ export class Avatar {
     this.neck = neck;
     this.la = makeArm(-1); this.ra = makeArm(1);
     this.ll = makeLeg(-1); this.rl = makeLeg(1);
+    // natural resting pose: arms slightly out from the torso
+    this.la.sh.rotation.z = 0.06;
+    this.ra.sh.rotation.z = -0.06;
     this.phase = Math.random() * 6.28;
     this._lean = 0;
   }

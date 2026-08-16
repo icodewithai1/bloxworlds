@@ -2,10 +2,12 @@
 import * as THREE from 'three';
 import {
   Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
-  ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome
+  ServerDirectory, makeServerCode, Audio, setupGameMenu, injectGameChrome,
+  showLoading, setupPlayerList, Effects
 } from '../engine/index.js';
 
 injectGameChrome();
+const doneLoading = showLoading('Mega Obby');
 
 const GAME_ID = 'obby';
 
@@ -26,6 +28,7 @@ const world = new World(engine);
 const input = new Input(engine.canvas);
 const audio = new Audio();
 audio.playMusic('chill');
+const fx = new Effects(engine);
 
 // ------------------------------------------------------------------ map
 function buildMap() {
@@ -93,12 +96,23 @@ function buildMap() {
 }
 buildMap();
 
+// checkpoint light beams + spawn ring + win beam
+for (const cp of world.checkpoints) {
+  fx.beam(cp.mesh.position.x, cp.mesh.position.y, cp.mesh.position.z, 0xffee58, 8, 0.5);
+}
+fx.spawnRing(0, 1, 0, 0x69f0ae, 2.4);
+{
+  const winPart = world.parts.find((p) => p.kind === 'win');
+  if (winPart) fx.beam(winPart.mesh.position.x, winPart.mesh.position.y + 0.5, winPart.mesh.position.z, 0xffd700, 14, 1.1);
+}
+
 // ------------------------------------------------------------------ player
 const player = new Player(engine, world, { name: db.name, look: db.look });
 db.recordPlay(GAME_ID);
 const runStart = performance.now();
 
 setupGameMenu({ gameName: 'Mega Obby', onRespawn: () => player.respawn(false) });
+const plist = setupPlayerList();
 
 // ------------------------------------------------------------------ UI
 const hud = document.getElementById('hud');
@@ -190,8 +204,9 @@ net.onEvent = (id, kind, e) => {
     }
   } else if (kind === 'win') {
     chatLine('SYSTEM', `🏆 ${name} finished the obby!`, true);
+    if (r) fx.confetti(r.avatar.group.position.clone().add(new THREE.Vector3(0, 2, 0)));
   } else if (kind === 'died') {
-    // quiet — could show effects
+    if (r) fx.burst(r.avatar.group.position.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xd32f2f, 14);
   }
 };
 net.join(db.name, db.look);
@@ -200,12 +215,14 @@ net.join(db.name, db.look);
 player.onDeath = () => {
   flash('You died!', '#ff5252');
   audio.play('death');
+  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1.5, 0)), 0xd32f2f, 16);
   db.recordDeath(GAME_ID);
   net.sendEvent('died');
 };
 player.onCheckpoint = (n) => {
   flash(`Checkpoint ${n}!`, '#69f0ae');
   audio.play('checkpoint');
+  fx.burst(player.pos.clone().add(new THREE.Vector3(0, 1, 0)), 0xffee58, 12, 6);
   db.recordStage(GAME_ID, n);
   net.sendEvent('stage', { n });
 };
@@ -214,6 +231,7 @@ player.onWin = () => {
   const s = db.recordWin(GAME_ID, t);
   flash('🏆 YOU WIN! 🏆', '#ffd700');
   audio.play('win');
+  fx.confetti(player.pos.clone().add(new THREE.Vector3(0, 2, 0)));
   chatLine('SYSTEM', `You finished in ${t}s (best: ${s.bestTime}s, wins: ${s.wins})`, true);
   net.sendEvent('win');
 };
@@ -266,9 +284,14 @@ engine.addSystem((dt, now) => {
   hud.innerHTML =
     `<b>${escapeHtml(db.name)}</b><br>` +
     `Stage: ${player.stage} / 4${player.won ? ' 🏆' : ''}<br>` +
-    `Deaths: ${player.deaths}<br>` +
-    `Players: ${remotes.size + 1}` +
+    `Deaths: ${player.deaths}` +
     (st.bestTime !== null ? `<br>Best: ${st.bestTime}s` : '');
+
+  plist.update([
+    { name: db.name, stat: 'Stage ' + player.stage, me: true },
+    ...[...remotes.values()].map((r) => ({ name: r.name, stat: 'Stage ' + (r.stage || 0) }))
+  ]);
 });
 
 engine.start();
+doneLoading();

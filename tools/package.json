@@ -1,0 +1,22 @@
+{
+  "name": "tools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babylonjs/core": "^9.21.2",
+    "@sparticuz/chromium": "^149.0.0",
+    "esbuild": "^0.28.2",
+    "javascript-obfuscator": "^4.2.2",
+    "playwright-core": "^1.62.1",
+    "puppeteer-core": "^25.7.0",
+    "three": "^0.160.0",
+    "trystero": "^0.25.3"
+  }
+}

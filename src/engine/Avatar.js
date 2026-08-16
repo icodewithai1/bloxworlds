@@ -62,94 +62,116 @@ function denimTexture(pants) {
 function headTexture(skin) {
   return canvasTex(512, 128, (ctx) => {
     ctx.fillStyle = hex(skin); ctx.fillRect(0, 0, 512, 128);
-    // front strip center (head rotated PI so face points +z)
-    const cx = 384;
-    // classic smiley: round eyes + smile arc
+    // CylinderGeometry: u=0.5 faces -z; head mesh is rotated PI so this
+    // strip ends up on +z — the same side as the torso's shirt front.
+    const cx = 256;
+    // face sits on the LOWER 2/3 of the head so hair fringe never covers it
     ctx.fillStyle = '#151515';
-    ctx.beginPath(); ctx.ellipse(cx - 40, 50, 11, 15, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + 40, 50, 11, 15, 0, 0, 7); ctx.fill();
-    // eye shine
+    ctx.beginPath(); ctx.ellipse(cx - 40, 62, 10, 14, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 40, 62, 10, 14, 0, 0, 7); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.85)';
-    ctx.beginPath(); ctx.ellipse(cx - 44, 44, 3.5, 4.5, 0, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + 36, 44, 3.5, 4.5, 0, 0, 7); ctx.fill();
-    // smile
+    ctx.beginPath(); ctx.ellipse(cx - 43, 57, 3.2, 4.2, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + 37, 57, 3.2, 4.2, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = '#151515';
-    ctx.lineWidth = 10; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(cx, 58, 42, 0.42, Math.PI - 0.42); ctx.stroke();
+    ctx.lineWidth = 9; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(cx, 72, 34, 0.45, Math.PI - 0.45); ctx.stroke();
   });
 }
 
 // ---------- carefully modeled hairstyles ----------
-// each returns a Group positioned relative to head center (head r=0.42, h=0.62)
+// Subtle, low-profile hair built from thin curved shells that hug the
+// cylinder head. The head must still read as a clean cylinder with a flat
+// top, so: thin cap disc, fringe stays ABOVE the face line (y >= 0.12),
+// nothing bulges more than 0.04 past the head radius.
+// Head-local coords: center y=0, flat top at y=+0.3, radius 0.4.
+const HEAD_R = 0.4;
 function buildHair(style, color) {
   const m1 = new THREE.MeshStandardMaterial({ color, roughness: 0.62 });
   const m2 = new THREE.MeshStandardMaterial({ color: shade(color, 1.32), roughness: 0.62 });
   const g = new THREE.Group();
-  const box = (w, h, d, x, y, z, rx = 0, ry = 0, rz = 0, m = m1) => {
-    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    b.position.set(x, y, z); b.rotation.set(rx, ry, rz);
-    b.castShadow = true;
-    g.add(b); return b;
-  };
-  const cyl = (rt, rb, h, x, y, z, rx = 0, rz = 0, m = m1, seg = 10) => {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), m);
-    c.position.set(x, y, z); c.rotation.set(rx, 0, rz);
+
+  // thin disc on the flat top — like painted-on hair, keeps the top visible
+  const cap = (h = 0.06, r = HEAD_R + 0.015, m = m1) => {
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24), m);
+    c.position.y = 0.3 + h / 2;
     c.castShadow = true;
-    g.add(c); return c;
+    g.add(c);
+    return c;
   };
-  const sph = (r, x, y, z, sx = 1, sy = 1, sz = 1, m = m1) => {
-    const s = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), m);
-    s.position.set(x, y, z); s.scale.set(sx, sy, sz);
+  // thin curved shell hugging the head. theta 0 = +z (face direction).
+  const shell = (centerDeg, widthDeg, top, bottom, m = m1, rOff = 0.03) => {
+    const L = (widthDeg * Math.PI) / 180;
+    const start = ((centerDeg * Math.PI) / 180) - L / 2;
+    const h = top - bottom;
+    const mm = m.clone();
+    mm.side = THREE.DoubleSide;
+    const s = new THREE.Mesh(
+      new THREE.CylinderGeometry(HEAD_R + rOff, HEAD_R + rOff, h, 16, 1, true, start, L),
+      mm
+    );
+    s.position.y = bottom + h / 2;
     s.castShadow = true;
-    g.add(s); return s;
+    g.add(s);
+    return s;
+  };
+  const cone = (r, h, x, y, z, rx = 0, rz = 0, m = m1) => {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 8), m);
+    c.position.set(x, y, z);
+    c.rotation.set(rx, 0, rz);
+    c.castShadow = true;
+    g.add(c);
+    return c;
   };
 
   switch (style) {
-    case 'bacon': // messy layered fringe
-      sph(0.46, 0, 0.16, 0, 1, 0.62, 1);                      // cap
-      box(0.62, 0.16, 0.2, 0, 0.13, 0.34, 0.35, 0, 0.08);     // fringe main
-      box(0.26, 0.2, 0.18, -0.22, 0.08, 0.34, 0.42, 0, 0.4, m2);
-      box(0.22, 0.17, 0.16, 0.2, 0.1, 0.35, 0.36, 0, -0.32);
-      box(0.16, 0.3, 0.5, -0.36, 0.02, -0.02, 0, 0, 0.18);    // sides
-      box(0.16, 0.26, 0.48, 0.37, 0.04, -0.03, 0, 0, -0.15, m2);
-      box(0.56, 0.2, 0.2, 0, 0.1, -0.33, -0.3, 0, 0);         // back
-      box(0.24, 0.12, 0.24, 0.08, 0.3, 0.05, 0.1, 0.5, -0.15, m2); // top tuft
+    case 'bacon': // classic messy: thin cap + short jagged fringe
+      cap(0.07);
+      shell(0, 40, 0.30, 0.16, m1);        // fringe center
+      shell(-32, 22, 0.30, 0.20, m2);      // shorter tuft
+      shell(32, 22, 0.30, 0.18, m1);       // tuft
+      shell(90, 50, 0.30, 0.08, m2);       // side
+      shell(-90, 50, 0.30, 0.10, m1);      // side
+      shell(180, 90, 0.30, 0.02, m1);      // back, slightly longer
       break;
-    case 'swoosh': // side-swept anime swoosh
-      sph(0.46, 0, 0.16, 0, 1, 0.6, 1);
-      cyl(0.1, 0.02, 0.5, -0.3, 0.1, 0.3, 1.15, 0.9, m2);     // big swoop
-      cyl(0.09, 0.02, 0.44, -0.1, 0.16, 0.34, 1.2, 0.45);
-      cyl(0.08, 0.02, 0.4, 0.12, 0.16, 0.33, 1.25, -0.3, m2);
-      cyl(0.08, 0.02, 0.36, 0.3, 0.1, 0.28, 1.2, -0.8);
-      box(0.16, 0.34, 0.46, -0.36, 0, -0.04, 0, 0, 0.12);
-      box(0.16, 0.3, 0.46, 0.36, 0.02, -0.04, 0, 0, -0.12);
-      box(0.6, 0.24, 0.18, 0, 0.06, -0.32, -0.25, 0, 0, m2);
+    case 'swoosh': // side-swept fringe with a flick
+      cap(0.07);
+      shell(-16, 56, 0.30, 0.14, m1);      // swept fringe
+      shell(26, 24, 0.30, 0.20, m2);
+      shell(112, 62, 0.30, 0.06, m1);      // side+back
+      shell(-112, 62, 0.30, 0.06, m2);
+      cone(0.07, 0.2, -0.2, 0.4, 0.26, 1.1, 0.55, m2); // flick tip
       break;
-    case 'spiky': // spiky anime hair
-      sph(0.45, 0, 0.14, 0, 1, 0.55, 1);
+    case 'spiky':
+      cap(0.06);
       for (let i = 0; i < 7; i++) {
         const a = (i / 7) * Math.PI * 2;
-        cyl(0.01, 0.09, 0.34, Math.cos(a) * 0.22, 0.38, Math.sin(a) * 0.22,
-          Math.sin(a) * 0.5, Math.cos(a) * 0.5, i % 2 ? m1 : m2, 6);
+        cone(0.07, 0.2, Math.cos(a) * 0.22, 0.4, Math.sin(a) * 0.22,
+          Math.sin(a) * 0.4, -Math.cos(a) * 0.4, i % 2 ? m2 : m1);
       }
-      cyl(0.01, 0.1, 0.4, 0, 0.44, 0, 0, 0, m2, 6);
-      box(0.56, 0.18, 0.16, 0, 0.1, 0.32, 0.4, 0, 0);
+      cone(0.08, 0.24, 0, 0.44, 0, 0, 0, m2);
       break;
-    case 'bob': // neat bob with straight fringe
-      sph(0.48, 0, 0.12, 0, 1, 0.72, 1);
-      box(0.64, 0.14, 0.14, 0, 0.2, 0.36, 0.15, 0, 0);        // straight fringe
-      box(0.18, 0.55, 0.44, -0.38, -0.12, -0.02);             // long sides
-      box(0.18, 0.55, 0.44, 0.38, -0.12, -0.02);
-      box(0.6, 0.5, 0.2, 0, -0.08, -0.34);                    // back curtain
+    case 'bob': // straight fringe + curtains (still above chin)
+      cap(0.08);
+      shell(0, 60, 0.30, 0.14, m1);        // straight fringe
+      shell(90, 52, 0.30, -0.22, m1);      // curtain
+      shell(-90, 52, 0.30, -0.22, m1);     // curtain
+      shell(180, 105, 0.30, -0.26, m2);    // back
       break;
-    case 'cap': // baseball cap + tufts
-      cyl(0.44, 0.46, 0.2, 0, 0.22, 0, 0, 0, m1, 14);
-      sph(0.44, 0, 0.3, 0, 1, 0.5, 1);
-      box(0.4, 0.06, 0.3, 0, 0.16, 0.5, 0.12);                // brim
-      box(0.18, 0.14, 0.14, -0.3, 0.02, 0.3, 0, 0, 0.3, m2);  // hair tufts
-      box(0.18, 0.14, 0.14, 0.3, 0.02, 0.3, 0, 0, -0.3, m2);
+    case 'cap': { // low-profile baseball cap
+      cap(0.09, HEAD_R + 0.03, m1);
+      shell(180, 190, 0.30, 0.14, m1, 0.035); // shallow band, back half
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.24), m1);
+      brim.position.set(0, 0.31, HEAD_R + 0.1);
+      brim.castShadow = true;
+      g.add(brim);
+      const btn = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), m2);
+      btn.position.y = 0.41;
+      g.add(btn);
+      shell(115, 34, 0.14, 0.02, m2);      // tufts under the cap
+      shell(-115, 34, 0.14, 0.02, m2);
       break;
-    default: // 'none'
+    }
+    default:
       break;
   }
   return g;
@@ -202,7 +224,7 @@ export class Avatar {
 
     // ---- Head: cylinder (classic look), face wrapped on the side
     const head = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.4, 0.4, 0.6, 20),
+      new THREE.CylinderGeometry(0.4, 0.4, 0.6, 28),
       [mHead, mSkin, mSkin]
     );
     head.castShadow = head.receiveShadow = true;
@@ -214,7 +236,9 @@ export class Avatar {
 
     // ---- hair mesh hugging the top of the cylinder
     const hair = buildHair(style, hairC);
-    hair.position.y = 0.14; // head half-height 0.3; hair pieces are built around y≈0..0.3
+    // hair is modeled in head-local space (theta 0 = +z face direction);
+    // head mesh is rotated PI, so rotate hair back so its front matches the face
+    hair.position.y = 0;
     hair.rotation.y = Math.PI;
     head.add(hair);
 

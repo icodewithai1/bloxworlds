@@ -2,48 +2,57 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>BloxWorlds</title>
 <link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<meta name="theme-color" content="#232527">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="topbar">
     <img src="assets/icon.png" alt="BloxWorlds">
-    <h1>BLOX<span>WORLDS</span></h1>
-    <div class="tag">Powered by imagination &bull; Free forever</div>
+    <h1>Blox<span>Worlds</span></h1>
+    <div class="tag">Serverless P2P multiplayer · Free forever</div>
   </div>
 
   <div class="wrap">
     <div class="panel">
-      <h2>Player Setup</h2>
-      <div class="row">
-        <label>Username</label>
-        <input id="uname" maxlength="20" placeholder="Builderman123">
-        <label>Multiplayer Server (ws:// or wss://)</label>
-        <input id="srv" placeholder="ws://localhost:8081">
+      <h2>👤 Player</h2>
+      <div class="avrow">
+        <div id="avprev"></div>
+        <div>
+          <div class="row">
+            <label>Username</label>
+            <input id="uname" maxlength="20" placeholder="Builderman123">
+            <button class="btn ghost" id="randlook">🎲 Random outfit</button>
+          </div>
+          <div class="stats" id="stats"></div>
+        </div>
       </div>
       <div class="hint">
-        No server? No problem &mdash; games still work in <b>solo mode</b>.
-        To play with friends, run the server in the <code>server/</code> folder
-        (<code>npm install &amp;&amp; npm start</code>) and paste its address here.
+        Multiplayer is fully <b>peer-to-peer</b> (WebRTC via Trystero) — no game server needed.
+        Open the same game on two devices and you'll find each other automatically. Works on mobile too!
       </div>
-      <div class="status" id="srvstat"></div>
     </div>
 
-    <h2 style="margin-bottom:14px">🎮 Games</h2>
+    <div class="section-title">🎮 Games</div>
     <div class="games">
       <div class="card" id="playObby">
         <img src="assets/obby.png" alt="Obby">
         <div class="body">
+          <span class="badge">P2P MULTIPLAYER</span>
           <h3>🏁 Mega Obby</h3>
-          <p>Jump across the sky islands, dodge the lava bricks, hit every checkpoint and reach the WIN pad. Real multiplayer!</p>
+          <p>Jump across the sky islands, dodge the lava bricks, ride the movers, duck the spinner, hit every checkpoint and reach the WIN pad.</p>
           <a class="btn" href="obby.html">▶ Play</a>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="js/hub.js"></script>
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three.min.js", "trystero/nostr": "./vendor/trystero-nostr.min.js" } }
+  </script>
+  <script type="module" src="js/hub.js"></script>
 </body>
 </html>

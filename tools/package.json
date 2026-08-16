@@ -10,6 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "javascript-obfuscator": "^4.2.2"
+    "esbuild": "^0.28.2",
+    "javascript-obfuscator": "^4.2.2",
+    "three": "^0.160.0",
+    "trystero": "^0.25.3"
   }
 }

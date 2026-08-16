@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Mega Obby - BloxWorlds</title>
 <link rel="icon" type="image/png" href="assets/icon.png">
+<meta name="theme-color" content="#87ceeb">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="game">
@@ -23,15 +24,16 @@
     WASD / arrows — move &nbsp;•&nbsp; Space — jump<br>
     Drag mouse — camera &nbsp;•&nbsp; Scroll — zoom<br>
     Enter — chat &nbsp;•&nbsp; R — respawn<br>
-    <a href="index.html" style="color:#8ecbff;pointer-events:auto">← Back to BloxWorlds</a>
+    <a href="index.html">← Back to BloxWorlds</a>
   </div>
 
+  <!-- mobile controls -->
+  <div id="joy"><div id="joyknob"></div></div>
+  <button id="jumpbtn">JUMP</button>
+  <button id="chatbtn">💬 Chat</button>
+
   <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-    }
-  }
+  { "imports": { "three": "./vendor/three.min.js", "trystero/nostr": "./vendor/trystero-nostr.min.js" } }
   </script>
   <script type="module" src="js/obby.js"></script>
 </body>

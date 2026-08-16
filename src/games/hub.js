@@ -7,10 +7,13 @@ const uname = document.getElementById('uname');
 const avPrev = document.getElementById('avprev');
 const randBtn = document.getElementById('randlook');
 const statsEl = document.getElementById('stats');
+const navUser = document.getElementById('navuser');
 
 uname.value = db.name;
+navUser.textContent = db.name;
 uname.addEventListener('input', () => {
   db.name = uname.value.trim() || db.name;
+  navUser.textContent = db.name;
 });
 
 function drawPreview() {
@@ -31,8 +34,4 @@ randBtn.addEventListener('click', () => {
 const s = db.stats('obby');
 statsEl.innerHTML = s.plays
   ? `Plays: <b>${s.plays}</b> · Wins: <b>${s.wins}</b> · Best time: <b>${s.bestTime !== null ? s.bestTime + 's' : '—'}</b> · Best stage: <b>${s.bestStage}</b>`
-  : 'No plays yet — jump in!';
-
-document.getElementById('playObby').addEventListener('click', (e) => {
-  if (e.target.tagName !== 'A') window.location.href = 'obby.html';
-});
+  : 'No plays yet — jump into a game!';

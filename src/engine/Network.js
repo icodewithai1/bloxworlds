@@ -5,6 +5,24 @@ import { joinRoom, selfId } from 'trystero/nostr';
 
 const APP_ID = 'bloxworlds-v1';
 
+// Compatibility: trystero <=0.21 makeAction returns [send, get];
+// trystero >=0.25 returns {send, onMessage(data, {peerId})}.
+function wrapAction(room, name) {
+  const a = room.makeAction(name);
+  if (Array.isArray(a)) {
+    return { send: a[0], onMessage: (fn) => a[1]((data, peerId) => fn(data, peerId)) };
+  }
+  return {
+    send: (data, target) => a.send(data, target ? { target } : undefined),
+    onMessage: (fn) => { a.onMessage = (data, ctx) => fn(data, ctx && ctx.peerId); }
+  };
+}
+
+function onPeerEvent(room, prop, fn) {
+  if (typeof room[prop] === 'function') room[prop](fn); // old API
+  else room[prop] = fn;                                 // new API (property)
+}
+
 export class Network {
   constructor(gameId) {
     this.selfId = selfId;
@@ -14,42 +32,49 @@ export class Network {
     this.onState = null;
     this.onChat = null;
     this.onEvent = null;
-    this.connected = false;
+    this.dead = false;
 
-    this.room = joinRoom({ appId: APP_ID }, gameId);
+    try {
+      this.room = joinRoom({ appId: APP_ID }, gameId);
+    } catch (e) {
+      console.warn('[BloxWorlds] P2P unavailable:', e);
+      this.dead = true;
+      return;
+    }
 
-    const [sendProfile, getProfile] = this.room.makeAction('profile');
-    const [sendState, getState] = this.room.makeAction('state');
-    const [sendChat, getChat] = this.room.makeAction('chat');
-    const [sendEvent, getEvent] = this.room.makeAction('event');
-    this._sendProfile = sendProfile;
-    this._sendState = sendState;
-    this._sendChat = sendChat;
-    this._sendEvent = sendEvent;
+    const profile = wrapAction(this.room, 'profile');
+    const state = wrapAction(this.room, 'state');
+    const chat = wrapAction(this.room, 'chat');
+    const event = wrapAction(this.room, 'event');
+    this._profileA = profile;
+    this._stateA = state;
+    this._chatA = chat;
+    this._eventA = event;
 
-    this.room.onPeerJoin((peerId) => {
-      this.connected = true;
+    onPeerEvent(this.room, 'onPeerJoin', (peerId) => {
       // introduce ourselves to the newcomer
-      if (this._profile) sendProfile(this._profile, peerId);
+      if (this._profile) {
+        try { profile.send(this._profile, peerId); } catch (e) {}
+      }
     });
 
-    this.room.onPeerLeave((peerId) => {
+    onPeerEvent(this.room, 'onPeerLeave', (peerId) => {
       const p = this.peers.get(peerId);
       this.peers.delete(peerId);
-      this.onPeerLeave && this.onPeerLeave(peerId, p);
+      if (p) this.onPeerLeave && this.onPeerLeave(peerId, p);
     });
 
-    getProfile((profile, peerId) => {
-      if (!profile || typeof profile !== 'object') return;
+    profile.onMessage((data, peerId) => {
+      if (!data || typeof data !== 'object' || !peerId) return;
       const known = this.peers.has(peerId);
       this.peers.set(peerId, {
-        name: sanitizeName(profile.name),
-        look: sanitizeLook(profile.look)
+        name: sanitizeName(data.name),
+        look: sanitizeLook(data.look)
       });
       if (!known) this.onPeerJoin && this.onPeerJoin(peerId, this.peers.get(peerId));
     });
 
-    getState((s, peerId) => {
+    state.onMessage((s, peerId) => {
       if (!this.peers.has(peerId)) return;
       if (!s || !Array.isArray(s.p) || s.p.length !== 4) return;
       const p = s.p.map(Number);
@@ -57,13 +82,13 @@ export class Network {
       this.onState && this.onState(peerId, p, !!s.g, Math.min(Math.abs(Number(s.s) || 0), 50));
     });
 
-    getChat((m, peerId) => {
+    chat.onMessage((m, peerId) => {
       if (!this.peers.has(peerId)) return;
       const text = sanitizeChat(m);
       if (text) this.onChat && this.onChat(peerId, text);
     });
 
-    getEvent((e, peerId) => {
+    event.onMessage((e, peerId) => {
       if (!this.peers.has(peerId) || !e || typeof e.k !== 'string') return;
       this.onEvent && this.onEvent(peerId, e.k, e);
     });
@@ -71,12 +96,14 @@ export class Network {
 
   join(name, look) {
     this._profile = { name: sanitizeName(name), look };
-    this._sendProfile(this._profile);
+    if (this.dead) return;
+    try { this._profileA.send(this._profile); } catch (e) {}
   }
 
   sendState(pos, yaw, grounded, speed) {
+    if (this.dead || this.peers.size === 0) return;
     try {
-      this._sendState({
+      this._stateA.send({
         p: [+pos.x.toFixed(2), +pos.y.toFixed(2), +pos.z.toFixed(2), +yaw.toFixed(2)],
         g: grounded ? 1 : 0,
         s: +speed.toFixed(1)
@@ -85,11 +112,13 @@ export class Network {
   }
 
   sendChat(text) {
-    try { this._sendChat(sanitizeChat(text)); } catch (e) {}
+    if (this.dead) return;
+    try { this._chatA.send(sanitizeChat(text)); } catch (e) {}
   }
 
   sendEvent(kind, data = {}) {
-    try { this._sendEvent({ k: kind, ...data }); } catch (e) {}
+    if (this.dead) return;
+    try { this._eventA.send({ k: kind, ...data }); } catch (e) {}
   }
 
   get peerCount() { return this.peers.size; }

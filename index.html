@@ -6,47 +6,52 @@
 <title>BloxWorlds</title>
 <link rel="icon" type="image/png" href="assets/icon.png">
 <link rel="apple-touch-icon" href="assets/icon.png">
-<meta name="theme-color" content="#232527">
+<meta name="theme-color" content="#ffffff">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div class="topbar">
-    <img src="assets/icon.png" alt="BloxWorlds">
-    <h1>Blox<span>Worlds</span></h1>
-    <div class="tag">Serverless P2P multiplayer · Free forever</div>
-  </div>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a class="brand" href="index.html">
+        <img src="assets/icon.png" alt="">
+        <span>BloxWorlds</span>
+      </a>
+      <a class="navlink active" href="index.html">Games</a>
+      <a class="navlink" href="#" onclick="return false">Avatar</a>
+      <a class="navlink" href="#" onclick="return false">Create</a>
+      <div class="search"><span>🔍</span><input placeholder="Search" disabled></div>
+      <div class="nav-user" id="navuser"></div>
+    </div>
+  </nav>
 
   <div class="wrap">
-    <div class="panel">
-      <h2>👤 Player</h2>
-      <div class="avrow">
-        <div id="avprev"></div>
-        <div>
-          <div class="row">
-            <label>Username</label>
-            <input id="uname" maxlength="20" placeholder="Builderman123">
-            <button class="btn ghost" id="randlook">🎲 Random outfit</button>
-          </div>
-          <div class="stats" id="stats"></div>
-        </div>
+    <div class="profile-card">
+      <div id="avprev"></div>
+      <div class="profile-info">
+        <input id="uname" maxlength="20" placeholder="Username" spellcheck="false">
+        <div class="stats" id="stats"></div>
       </div>
-      <div class="hint">
-        Multiplayer is fully <b>peer-to-peer</b> (WebRTC via Trystero) — no game server needed.
-        Open the same game on two devices and you'll find each other automatically. Works on mobile too!
-      </div>
+      <button class="btn ghost" id="randlook">🎲 Randomize</button>
     </div>
 
-    <div class="section-title">🎮 Games</div>
+    <div class="sort-row">
+      <h2>Recommended For You</h2>
+      <a class="seeall" href="#" onclick="return false">See All</a>
+    </div>
     <div class="games">
-      <div class="card" id="playObby">
-        <img src="assets/obby.png" alt="Obby">
-        <div class="body">
-          <span class="badge">P2P MULTIPLAYER</span>
-          <h3>🏁 Mega Obby</h3>
-          <p>Jump across the sky islands, dodge the lava bricks, ride the movers, duck the spinner, hit every checkpoint and reach the WIN pad.</p>
-          <a class="btn" href="obby.html">▶ Play</a>
-        </div>
-      </div>
+      <a class="gcard" id="playObby" href="obby.html">
+        <div class="thumb"><img src="assets/obby.png" alt="Mega Obby"></div>
+        <div class="gtitle">Mega Obby</div>
+        <div class="gmeta"><span class="up">👍 94%</span><span class="playing" id="playingCt">👤 P2P</span></div>
+      </a>
+      <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
+      <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
+      <div class="gcard soon"><div class="thumb dim"></div><div class="gtitle">Coming soon…</div><div class="gmeta"><span class="up">—</span></div></div>
+    </div>
+
+    <div class="note">
+      Multiplayer is fully <b>peer-to-peer</b> (WebRTC) — no servers. Open the same game on two
+      devices and you'll meet each other in-game automatically. Mobile supported. 📱
     </div>
   </div>
 

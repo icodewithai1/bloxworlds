@@ -110,13 +110,24 @@ function chatLine(name, text, sys) {
 }
 
 // ------------------------------------------------------------------ network (P2P)
-const net = new Network(GAME_ID);
+let net;
+try {
+  net = new Network(GAME_ID);
+} catch (e) {
+  console.warn('[BloxWorlds] multiplayer disabled:', e);
+  net = { dead: true, peerCount: 0, join() {}, sendState() {}, sendChat() {}, sendEvent() {} };
+}
 const remotes = new Map();
 
 function setConn() {
+  if (net.dead) {
+    connEl.className = 'off';
+    connEl.textContent = '● Solo mode';
+    return;
+  }
   const n = net.peerCount;
   connEl.className = n > 0 ? 'on' : 'off';
-  connEl.textContent = n > 0 ? `● P2P — ${n + 1} players` : '● Looking for players… (P2P)';
+  connEl.textContent = n > 0 ? `● P2P — ${n + 1} players` : '● Waiting for players… (P2P on)';
 }
 setConn();
 

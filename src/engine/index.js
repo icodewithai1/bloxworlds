@@ -6,3 +6,4 @@ export { Player, RemotePlayer } from './Player.js';
 export { Input } from './Input.js';
 export { Network } from './Network.js';
 export { Database } from './Database.js';
+export { ServerDirectory, makeServerCode } from './ServerDirectory.js';

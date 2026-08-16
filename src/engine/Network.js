@@ -24,6 +24,7 @@ function onPeerEvent(room, prop, fn) {
 }
 
 export class Network {
+  // roomId: e.g. 'obby:ABC123' — a specific server instance of a game
   constructor(gameId) {
     this.selfId = selfId;
     this.peers = new Map(); // peerId -> profile {name, look}
@@ -133,7 +134,7 @@ function sanitizeChat(s) {
 function sanitizeLook(look) {
   if (!look || typeof look !== 'object') return {};
   const out = {};
-  for (const k of ['body', 'pants', 'skin']) {
+  for (const k of ['shirt', 'jacket', 'pants', 'hair', 'skin', 'body']) {
     const v = Number(look[k]);
     if (Number.isInteger(v) && v >= 0 && v <= 0xffffff) out[k] = v;
   }

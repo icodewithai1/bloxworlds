@@ -9,6 +9,10 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // modern shading: filmic tone mapping + correct color space
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.12;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x87ceeb);
@@ -16,14 +20,20 @@ export class Engine {
 
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
 
-    const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+    const sun = new THREE.DirectionalLight(0xfff4e0, 2.6);
     sun.position.set(60, 120, 40);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.radius = 6;
+    sun.shadow.bias = -0.0004;
     Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 140, bottom: -140, far: 420 });
     this.scene.add(sun);
-    this.scene.add(new THREE.AmbientLight(0xbfd9ff, 1.1));
-    this.scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x6a8f5a, 0.6));
+    this.scene.add(new THREE.AmbientLight(0xbfd9ff, 0.55));
+    this.scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x707c6a, 1.0));
+    // subtle fill from the opposite side so shaded faces aren't flat black
+    const fill = new THREE.DirectionalLight(0xa8c4e0, 0.5);
+    fill.position.set(-50, 60, -60);
+    this.scene.add(fill);
     this.sun = sun;
 
     this._systems = [];

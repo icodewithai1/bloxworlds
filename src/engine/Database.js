@@ -2,8 +2,10 @@
 // Stores profile, avatar look, and per-game stats like best times & wins.
 const KEY = 'bloxworlds_db_v1';
 
-const BODY_COLORS = [0x0b5bd3, 0xd32f2f, 0x00897b, 0xf9a825, 0x6a1b9a, 0x37474f];
-const PANT_COLORS = [0x2e7d32, 0x283593, 0x4e342e, 0x37474f, 0xad1457];
+const SHIRT_COLORS = [0x1f7fd1, 0xd32f2f, 0x00a06a, 0xf9a825, 0x8e24aa, 0xe8e8e8];
+const JACKET_COLORS = [0x17181a, 0x2c3540, 0x4e342e, 0x263a26, 0x3c1f42];
+const PANT_COLORS = [0x2a332a, 0x27303d, 0x3a2c22, 0x21252a, 0x402433];
+const HAIR_COLORS = [0x7a4a21, 0x2c221b, 0xc9a04a, 0x8d3b1f, 0x3a3a3c];
 
 function pick(arr) { return arr[(Math.random() * arr.length) | 0]; }
 
@@ -20,8 +22,11 @@ export class Database {
       const old = (localStorage.getItem('bw_name') || '').trim();
       this.data.profile.name = old || 'Guest' + ((Math.random() * 9000 + 1000) | 0);
     }
-    if (!this.data.profile.look) {
-      this.data.profile.look = { body: pick(BODY_COLORS), pants: pick(PANT_COLORS), skin: 0xf5c542 };
+    if (!this.data.profile.look || this.data.profile.look.shirt === undefined) {
+      this.data.profile.look = {
+        shirt: pick(SHIRT_COLORS), jacket: pick(JACKET_COLORS),
+        pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS), skin: 0xf3f3f3
+      };
     }
     this.save();
   }
@@ -36,7 +41,10 @@ export class Database {
   get look() { return this.data.profile.look; }
   setLook(look) { this.data.profile.look = look; this.save(); }
   randomizeLook() {
-    this.setLook({ body: pick(BODY_COLORS), pants: pick(PANT_COLORS), skin: 0xf5c542 });
+    this.setLook({
+      shirt: pick(SHIRT_COLORS), jacket: pick(JACKET_COLORS),
+      pants: pick(PANT_COLORS), hair: pick(HAIR_COLORS), skin: 0xf3f3f3
+    });
     return this.look;
   }
 

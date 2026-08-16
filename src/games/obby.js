@@ -1,10 +1,18 @@
 // BloxWorlds — Mega Obby (built on the BloxWorlds engine + Trystero P2P)
 import * as THREE from 'three';
 import {
-  Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml
+  Engine, World, Player, RemotePlayer, Input, Network, Database, escapeHtml,
+  ServerDirectory, makeServerCode
 } from '../engine/index.js';
 
 const GAME_ID = 'obby';
+
+// ---- server instance: ?server=CODE joins that server, otherwise host a new one
+const urlq = new URLSearchParams(location.search);
+let SERVER_CODE = (urlq.get('server') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+const IS_HOST = !SERVER_CODE;
+if (IS_HOST) SERVER_CODE = makeServerCode();
+const ROOM_ID = GAME_ID + ':' + SERVER_CODE;
 const RAINBOW = [0xe2231a, 0xff8f00, 0xfdd835, 0x43a047, 0x1e88e5, 0x8e24aa];
 
 // ------------------------------------------------------------------ setup
@@ -112,12 +120,25 @@ function chatLine(name, text, sys) {
 // ------------------------------------------------------------------ network (P2P)
 let net;
 try {
-  net = new Network(GAME_ID);
+  net = new Network(ROOM_ID);
 } catch (e) {
   console.warn('[BloxWorlds] multiplayer disabled:', e);
   net = { dead: true, peerCount: 0, join() {}, sendState() {}, sendChat() {}, sendEvent() {} };
 }
 const remotes = new Map();
+
+// advertise this server in the global lobby directory so it shows on every hub
+let directory = null;
+try {
+  directory = new ServerDirectory();
+  directory.advertise(() => ({
+    code: SERVER_CODE,
+    game: GAME_ID,
+    name: 'Mega Obby — ' + SERVER_CODE,
+    host: db.name,
+    players: remotes.size + 1
+  }));
+} catch (e) { console.warn('[BloxWorlds] lobby advertise failed:', e); }
 
 function setConn() {
   if (net.dead) {
@@ -127,9 +148,10 @@ function setConn() {
   }
   const n = net.peerCount;
   connEl.className = n > 0 ? 'on' : 'off';
-  connEl.textContent = n > 0 ? `● P2P — ${n + 1} players` : '● Waiting for players… (P2P on)';
+  connEl.textContent = (n > 0 ? `● ${n + 1} players` : '● Waiting for players') + ` — Server ${SERVER_CODE}`;
 }
 setConn();
+chatLine('SYSTEM', (IS_HOST ? 'You created server ' : 'Joined server ') + SERVER_CODE + ' — it is now listed on the BloxWorlds home page.', true);
 
 net.onPeerJoin = (id, profile) => {
   remotes.set(id, new RemotePlayer(engine, profile));
